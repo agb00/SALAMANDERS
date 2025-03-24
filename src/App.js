@@ -1,28 +1,29 @@
 // src/App.js
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Header from './components/Header';
 import Home from './pages/Home';
-import UploadTimetable from './pages/UploadTimetable';
-import ScheduleManagement from './pages/ScheduleManagement';
-import TeamManagement from './pages/TeamManagement';
-import CommonTime from './pages/CommonTime';
+import Login from './pages/Login';
 
 function App() {
+  // localStorage에 저장된 인증 토큰을 불러오거나, 없으면 null로 초기화
+  const [token, setToken] = useState(localStorage.getItem('authToken') || null);
+
+  // 로그인 성공 시 호출되어 토큰을 저장하고 상태 업데이트
+  const handleLogin = (newToken) => {
+    setToken(newToken);
+    localStorage.setItem('authToken', newToken);
+  };
+
   return (
     <Router>
-      <nav>
-        <Link to="/">Home</Link>
-        <Link to="/upload">시간표 업로드</Link>
-        <Link to="/schedule">일정 관리</Link>
-        <Link to="/team">팀 관리</Link>
-        <Link to="/common">공통 시간</Link>
-      </nav>
+      <Header />
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/upload" element={<UploadTimetable />} />
-        <Route path="/schedule" element={<ScheduleManagement />} />
-        <Route path="/team" element={<TeamManagement />} />
-        <Route path="/common" element={<CommonTime />} />
+        {/* 인증된 사용자만 Home 페이지 접근 가능 */}
+        <Route path="/" element={ token ? <Home /> : <Navigate to="/login" /> } />
+        {/* 로그인 페이지 */}
+        <Route path="/login" element={<Login onLogin={handleLogin} />} />
+        {/* 추가적인 보호된 라우트를 나중에 여기 추가할 수 있습니다. */}
       </Routes>
     </Router>
   );
