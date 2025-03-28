@@ -1,60 +1,53 @@
-// src/pages/Login.js
+// App.js (또는 Login.js 등)
 import React, { useState } from 'react';
 
-function Login({ onLogin }) {
-  const [username, setUsername] = useState('');
+function LoginForm({ onLoginSuccess }) {
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
 
-  // 로그인 폼 제출 핸들러
-  const handleSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
+
     try {
-      // 예시 API 호출 (실제 API 엔드포인트로 수정)
-      const response = await fetch('/api/login', {
+      const response = await fetch('http://localhost:4000/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ name, password }),
       });
 
-      if (!response.ok) {
-        throw new Error('로그인 실패');
-      }
-
       const data = await response.json();
-      // 예를 들어, data.token 에 JWT 토큰이 있다고 가정
-      onLogin(data.token);
-    } catch (error) {
-      console.error(error);
-      alert('로그인에 실패했습니다.');
+
+      if (response.ok && data.success) {
+        alert('로그인 성공!');
+        onLoginSuccess(); // 부모 컴포넌트로 로그인 성공 알림
+      } else {
+        alert(data.error || '로그인 실패');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('서버에 연결할 수 없습니다.');
     }
   };
 
   return (
-    <div className="login-container">
-      <h2>로그인</h2>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label>아이디:</label>
-          <input 
-            type="text" 
-            value={username} 
-            onChange={(e) => setUsername(e.target.value)} 
-            required 
-          />
-        </div>
-        <div>
-          <label>비밀번호:</label>
-          <input 
-            type="password" 
-            value={password} 
-            onChange={(e) => setPassword(e.target.value)} 
-            required 
-          />
-        </div>
-        <button type="submit">로그인</button>
-      </form>
-    </div>
+    <form onSubmit={handleLogin} className="login-form">
+      <input
+        type="text"
+        placeholder="이름"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        required
+      />
+      <input
+        type="password"
+        placeholder="비밀번호"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        required
+      />
+      <button type="submit">로그인</button>
+    </form>
   );
 }
 
-export default Login;
+export default LoginForm;
