@@ -63,7 +63,7 @@ app.post('/register', async (req, res) => {
   }
 });
 
-// 로그인 엔드포인트 수정
+// 로그인 엔드포인트
 app.post('/login', async (req, res) => {
   const { name, password } = req.body;
   if (!name || !password) {
@@ -85,19 +85,21 @@ app.post('/login', async (req, res) => {
       return res.status(401).json({ error: '비밀번호가 일치하지 않습니다.' });
     }
 
-    // 로그인 성공 시, 세션에 사용자 정보 저장
+    // 로그인 성공 시, 세션에 사용자 정보 저장 (ST도 포함)
     req.session.user = {
       name: user.name,
       isAdmin: user.name.toLowerCase() === 'sala',
-      ST: user.ST, 
+      ST: user.ST,
     };
 
-    return res.json({ success: true, message: '로그인 성공' });
+    // 사용자 정보를 함께 반환합니다.
+    return res.json({ success: true, message: '로그인 성공', user: req.session.user });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: '로그인 중 오류가 발생했습니다.' });
   }
 });
+
 
 
 // 세션 상태 확인 엔드포인트

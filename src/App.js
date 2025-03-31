@@ -27,12 +27,11 @@ function LoginModal({ onLoginSuccess }) {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-
     try {
       const response = await fetch('http://localhost:4000/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', // 세션 쿠키 포함
+        credentials: 'include',
         body: JSON.stringify({ name: username, password }),
       });
 
@@ -40,7 +39,8 @@ function LoginModal({ onLoginSuccess }) {
 
       if (response.ok && data.success) {
         alert('로그인 성공!');
-        onLoginSuccess(username.toLowerCase() === 'sala');
+        // 사용자 정보(data.user)를 함께 전달합니다.
+        onLoginSuccess(data.user);
       } else {
         alert(data.error || '로그인 실패');
       }
@@ -84,11 +84,10 @@ function AppContent() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [username, setUsername] = useState('');
-  const [gisu, setGisu] = useState(''); // 기수 정보를 저장할 state (서버에서는 "ST" 컬럼)
+  const [gisu, setGisu] = useState('');
   const [showModal, setShowModal] = useState(false);
   const navigate = useNavigate();
 
-  // 페이지 로드(새로고침 포함) 시 세션 확인하여 상태 복원
   useEffect(() => {
     fetch('http://localhost:4000/session', {
       credentials: 'include',
@@ -99,7 +98,6 @@ function AppContent() {
           setIsLoggedIn(true);
           setIsAdmin(data.user.isAdmin);
           setUsername(data.user.name);
-          // 서버에서 ST 컬럼으로 기수 정보를 반환하므로
           setGisu(data.user.ST);
         }
       })
@@ -108,12 +106,14 @@ function AppContent() {
 
   const handleLogoClick = () => setShowModal(true);
 
-  // 로그인 성공 시 상태 갱신 후 바로 페이지 이동
-  const handleLoginSuccess = (isAdminAccount) => {
+  // 로그인 성공 시 사용자 정보를 바로 업데이트
+  const handleLoginSuccess = (user) => {
     setIsLoggedIn(true);
-    setIsAdmin(isAdminAccount);
+    setIsAdmin(user.isAdmin);
+    setUsername(user.name);
+    setGisu(user.ST);
     setShowModal(false);
-    if (isAdminAccount) {
+    if (user.isAdmin) {
       navigate('/admin');
     } else {
       navigate('/');
@@ -178,7 +178,6 @@ function AppContent() {
             </AdminRoute>
           }
         />
-        {/* 사용자 전용 페이지 */}
         <Route path="/user/timetable" element={<UserTimetable />} />
         <Route path="/user/schedule" element={<UserSchedule />} />
         <Route path="/user/practice" element={<UserPractice />} />
