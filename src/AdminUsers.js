@@ -117,6 +117,7 @@ function AdminUsers() {
               <th style={thStyle}>비밀번호</th>
               <th style={thStyle}>전화번호</th>
               <th style={thStyle}>파트</th>
+              <th style={thStyle}>기수</th>
               <th style={thStyle}>액션</th>
             </tr>
           </thead>
@@ -127,6 +128,7 @@ function AdminUsers() {
                 <td style={tdStyle}>{user.password}</td>
                 <td style={tdStyle}>{user.phone}</td>
                 <td style={tdStyle}>{user.part}</td>
+                <td style={tdStyle}>{user.ST}</td>
                 <td style={tdStyle}>
                   <button onClick={() => setEditUser(user)} style={{ ...actionButtonStyle, marginRight: '5px' }}>
                     수정
@@ -248,14 +250,15 @@ function AddUserModal({ onClose, onAdd }) {
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [part, setPart] = useState('');
+  const [ST, setST] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name || !password || !phone || !part) {
+    if (!name || !password || !phone || !part || !ST) {
       alert('모든 필드를 입력하세요.');
       return;
     }
-    const newUser = { name, password, phone, part };
+    const newUser = { name, password, phone, part, ST };
     await onAdd(newUser);
   };
 
@@ -272,6 +275,8 @@ function AddUserModal({ onClose, onAdd }) {
           <input style={inputStyle} type="text" value={phone} onChange={(e) => setPhone(e.target.value)} />
           <label>파트:</label>
           <input style={inputStyle} type="text" value={part} onChange={(e) => setPart(e.target.value)} />
+          <label>ST:</label>
+          <input style={inputStyle} type="text" value={ST} onChange={(e) => setST(e.target.value)} />
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
             <button type="button" onClick={onClose} style={modalCancelButtonStyle}>
               취소
@@ -291,10 +296,11 @@ function EditUserModal({ user, onClose, onUpdate }) {
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState(user.phone);
   const [part, setPart] = useState(user.part);
+  const [ST, setST] = useState(user.ST);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const updatedUser = { name: user.name, password, phone, part };
+    const updatedUser = { name: user.name, password, phone, part, ST};
     await onUpdate(updatedUser);
   };
 
@@ -317,6 +323,8 @@ function EditUserModal({ user, onClose, onUpdate }) {
           <input style={inputStyle} type="text" value={phone} onChange={(e) => setPhone(e.target.value)} />
           <label>파트:</label>
           <input style={inputStyle} type="text" value={part} onChange={(e) => setPart(e.target.value)} />
+          <label>기수:</label>
+          <input style={inputStyle} type="text" value={ST} onChange={(e) => setST(e.target.value)} />
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
             <button type="button" onClick={onClose} style={modalCancelButtonStyle}>
               취소

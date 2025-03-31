@@ -42,8 +42,8 @@ const pool = mariadb.createPool({
 
 // 회원가입 엔드포인트
 app.post('/register', async (req, res) => {
-  const { name, password, phone, part } = req.body;
-  if (!name || !password || !phone || !part) {
+  const { name, password, phone, part, ST } = req.body;
+  if (!name || !password || !phone || !part || !ST) {
     return res.status(400).json({ error: '모든 필드를 입력하세요.' });
   }
 
@@ -51,8 +51,8 @@ app.post('/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const conn = await pool.getConnection();
     await conn.query(
-      'INSERT INTO users (name, password, phone, part) VALUES (?, ?, ?, ?)',
-      [name, hashedPassword, phone, part]
+      'INSERT INTO users (name, password, phone, part, ST) VALUES (?, ?, ?, ?, ?)',
+      [name, hashedPassword, phone, part, ST]
     );
     conn.release();
 
@@ -63,7 +63,7 @@ app.post('/register', async (req, res) => {
   }
 });
 
-// 로그인 엔드포인트
+// 로그인 엔드포인트 수정
 app.post('/login', async (req, res) => {
   const { name, password } = req.body;
   if (!name || !password) {
@@ -85,10 +85,11 @@ app.post('/login', async (req, res) => {
       return res.status(401).json({ error: '비밀번호가 일치하지 않습니다.' });
     }
 
-    // 로그인 성공 시, 세션에 사용자 정보 저장 (관리자 여부 판단)
+    // 로그인 성공 시, 세션에 사용자 정보 저장
     req.session.user = {
       name: user.name,
-      isAdmin: user.name.toLowerCase() === 'sala'
+      isAdmin: user.name.toLowerCase() === 'sala',
+      ST: user.ST, 
     };
 
     return res.json({ success: true, message: '로그인 성공' });
@@ -97,6 +98,7 @@ app.post('/login', async (req, res) => {
     return res.status(500).json({ error: '로그인 중 오류가 발생했습니다.' });
   }
 });
+
 
 // 세션 상태 확인 엔드포인트
 app.get('/session', (req, res) => {
@@ -109,17 +111,20 @@ app.get('/session', (req, res) => {
 
 // 관리자 전용 사용자 등록 엔드포인트
 app.post('/admin/add-user', async (req, res) => {
-  const { name, password, phone, part } = req.body;
-  if (!name || !password || !phone || !part) {
+  const { name, password, phone, part, ST } = req.body;
+  
+  // 모든 필드가 입력되었는지 확인
+  if (!name || !password || !phone || !part || !ST) {
     return res.status(400).json({ error: '모든 필드를 입력하세요.' });
   }
 
   try {
+    // 비밀번호 해싱
     const hashedPassword = await bcrypt.hash(password, 10);
     const conn = await pool.getConnection();
     await conn.query(
-      'INSERT INTO users (name, password, phone, part) VALUES (?, ?, ?, ?)',
-      [name, hashedPassword, phone, part]
+      'INSERT INTO users (name, password, phone, part, ST) VALUES (?, ?, ?, ?, ?)',
+      [name, hashedPassword, phone, part, ST]
     );
     conn.release();
 
@@ -134,7 +139,7 @@ app.post('/admin/add-user', async (req, res) => {
 app.get('/admin/users', async (req, res) => {
   try {
     const conn = await pool.getConnection();
-    const rows = await conn.query('SELECT name, password, phone, part FROM users');
+    const rows = await conn.query('SELECT name, password, phone, part, ST FROM users');
     conn.release();
     res.json(rows);
   } catch (err) {
@@ -170,32 +175,31 @@ app.delete('/admin/users/:name', async (req, res) => {
 // 관리자 전용 사용자 수정 엔드포인트
 app.put('/admin/users/:name', async (req, res) => {
   const { name } = req.params;
-  const { password, phone, part } = req.body;
+  const { password, phone, part, ST } = req.body;
   
   try {
     const conn = await pool.getConnection();
 
-    let result;
-    if (password && password.trim() !== "") {
-      // 새 비밀번호가 입력된 경우, 해싱 후 업데이트
+    if (password && password.trim() !== '') {
+      // 새 비밀번호가 입력된 경우
       const hashedPassword = await bcrypt.hash(password, 10);
-      result = await conn.query(
-        'UPDATE users SET password = ?, phone = ?, part = ? WHERE name = ?',
-        [hashedPassword, phone, part, name]
+      await conn.query(
+        'UPDATE users SET password = ?, phone = ?, part = ?, ST = ? WHERE name = ?',
+        [hashedPassword, phone, part, ST, name]
       );
     } else {
-      // 비밀번호가 비어 있으면, 전화번호와 부서만 업데이트 (기존 비밀번호 유지)
-      result = await conn.query(
-        'UPDATE users SET phone = ?, part = ? WHERE name = ?',
-        [phone, part, name]
+      // 비밀번호를 변경하지 않을 경우 다른 필드만 업데이트
+      await conn.query(
+        'UPDATE users SET phone = ?, part = ?, ST = ? WHERE name = ?',
+        [phone, part, ST, name]
       );
     }
-
+    
     conn.release();
-    res.json({ success: true, message: '사용자 수정 완료' });
+    return res.json({ success: true, message: '사용자 수정 완료' });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: '사용자 수정 중 오류 발생' });
+    return res.status(500).json({ error: '사용자 수정 중 오류 발생' });
   }
 });
 

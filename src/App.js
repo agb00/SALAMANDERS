@@ -2,7 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import salLogo from './Sal_logo.jpg';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+} from 'react-router-dom';
 
 import AdminPanel from './AdminPanel';
 import AdminUsers from './AdminUsers';
@@ -14,7 +20,6 @@ import UserTimetable from './UserTimetable';
 import UserSchedule from './UserSchedule';
 import UserPractice from './UserPractice';
 import UserTeam from './UserTeam';
-
 
 function LoginModal({ onLoginSuccess }) {
   const [username, setUsername] = useState('');
@@ -75,30 +80,27 @@ const AdminRoute = ({ isAdmin, children }) => {
   return isAdmin ? children : <Navigate to="/" />;
 };
 
-const MainScreen = () => (
-  <div className="main-screen">
-    <h1>메인 화면</h1>
-    <p>이곳에 일반 사용자 콘텐츠를 배치하세요.</p>
-  </div>
-);
-
-// 별도의 컴포넌트로 분리해서 useNavigate 사용
 function AppContent() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [username, setUsername] = useState('');
+  const [gisu, setGisu] = useState(''); // 기수 정보를 저장할 state (서버에서는 "ST" 컬럼)
   const [showModal, setShowModal] = useState(false);
   const navigate = useNavigate();
 
   // 페이지 로드(새로고침 포함) 시 세션 확인하여 상태 복원
   useEffect(() => {
     fetch('http://localhost:4000/session', {
-      credentials: 'include', // 쿠키 포함 필수
+      credentials: 'include',
     })
       .then((res) => res.json())
       .then((data) => {
         if (data.loggedIn) {
           setIsLoggedIn(true);
           setIsAdmin(data.user.isAdmin);
+          setUsername(data.user.name);
+          // 서버에서 ST 컬럼으로 기수 정보를 반환하므로
+          setGisu(data.user.ST);
         }
       })
       .catch((err) => console.error('세션 확인 실패:', err));
@@ -137,17 +139,13 @@ function AppContent() {
         <Route
           path="/"
           element={
-            isLoggedIn ? (isAdmin ? <Navigate to="/admin" /> : <UserMain />) : null
+            isLoggedIn
+              ? isAdmin
+                ? <Navigate to="/admin" />
+                : <UserMain username={username} gisu={gisu} />
+              : null
           }
         />
-        
-        <Route
-          path="/"
-          element={
-            isLoggedIn ? (isAdmin ? <Navigate to="/admin" /> : <MainScreen />) : null
-          }
-        />
-
         <Route
           path="/admin"
           element={
@@ -156,7 +154,6 @@ function AppContent() {
             </AdminRoute>
           }
         />
-
         <Route
           path="/admin/users"
           element={
@@ -165,7 +162,6 @@ function AppContent() {
             </AdminRoute>
           }
         />
-
         <Route
           path="/admin/schedule"
           element={
@@ -174,7 +170,6 @@ function AppContent() {
             </AdminRoute>
           }
         />
-
         <Route
           path="/admin/teams"
           element={
@@ -183,6 +178,11 @@ function AppContent() {
             </AdminRoute>
           }
         />
+        {/* 사용자 전용 페이지 */}
+        <Route path="/user/timetable" element={<UserTimetable />} />
+        <Route path="/user/schedule" element={<UserSchedule />} />
+        <Route path="/user/practice" element={<UserPractice />} />
+        <Route path="/user/team" element={<UserTeam />} />
       </Routes>
     </div>
   );

@@ -2,9 +2,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-function UserMain({ username }) {
+function UserMain({ username, gisu }) {
   const navigate = useNavigate();
 
+  // 로그아웃 처리 함수
   const handleLogout = async () => {
     try {
       const res = await fetch('http://localhost:4000/logout', {
@@ -24,22 +25,23 @@ function UserMain({ username }) {
 
   return (
     <div style={{ padding: '40px', maxWidth: '600px', margin: '0 auto' }}>
-      <h2>사용자 페이지 ({username})</h2>
+      <h2>📋 {gisu} {username}</h2>
+      <p>원하는 항목을 선택하여 사용 기능을 이용하세요.</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '30px' }}>
         <button onClick={() => navigate('/user/timetable')} style={btnStyle}>
-          시간표 관리
+          ⏰ 시간표 관리
         </button>
         <button onClick={() => navigate('/user/schedule')} style={btnStyle}>
-          일정 관리
+          📅 일정 관리
         </button>
         <button onClick={() => navigate('/user/practice')} style={btnStyle}>
-          연습 일정
+          🏋️‍♀️ 연습 일정
         </button>
         <button onClick={() => navigate('/user/team')} style={btnStyle}>
-          팀 관리
+          🧑‍🤝‍🧑 팀 관리
         </button>
         <button onClick={handleLogout} style={btnStyle}>
-          로그아웃
+          🔒 로그아웃
         </button>
       </div>
     </div>
