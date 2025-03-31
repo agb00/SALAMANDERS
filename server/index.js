@@ -134,7 +134,7 @@ app.post('/admin/add-user', async (req, res) => {
 app.get('/admin/users', async (req, res) => {
   try {
     const conn = await pool.getConnection();
-    const rows = await conn.query('SELECT name, phone, part FROM users');
+    const rows = await conn.query('SELECT name, password, phone, part FROM users');
     conn.release();
     res.json(rows);
   } catch (err) {
@@ -146,4 +146,67 @@ app.get('/admin/users', async (req, res) => {
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`✅ 서버가 포트 ${PORT}에서 실행 중입니다`);
+});
+
+// 관리자 전용 사용자 삭제 엔드포인트
+app.delete('/admin/users/:name', async (req, res) => {
+  const { name } = req.params;
+  try {
+    const conn = await pool.getConnection();
+    const result = await conn.query('DELETE FROM users WHERE name = ?', [name]);
+    conn.release();
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: '해당 사용자를 찾을 수 없습니다.' });
+    }
+
+    res.json({ success: true, message: '사용자 삭제 완료' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '사용자 삭제 중 오류 발생' });
+  }
+});
+
+// 관리자 전용 사용자 수정 엔드포인트
+app.put('/admin/users/:name', async (req, res) => {
+  const { name } = req.params;
+  const { password, phone, part } = req.body;
+  
+  try {
+    const conn = await pool.getConnection();
+
+    let result;
+    if (password && password.trim() !== "") {
+      // 새 비밀번호가 입력된 경우, 해싱 후 업데이트
+      const hashedPassword = await bcrypt.hash(password, 10);
+      result = await conn.query(
+        'UPDATE users SET password = ?, phone = ?, part = ? WHERE name = ?',
+        [hashedPassword, phone, part, name]
+      );
+    } else {
+      // 비밀번호가 비어 있으면, 전화번호와 부서만 업데이트 (기존 비밀번호 유지)
+      result = await conn.query(
+        'UPDATE users SET phone = ?, part = ? WHERE name = ?',
+        [phone, part, name]
+      );
+    }
+
+    conn.release();
+    res.json({ success: true, message: '사용자 수정 완료' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '사용자 수정 중 오류 발생' });
+  }
+});
+
+// 로그아웃 엔드포인트
+app.post('/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: '로그아웃 중 오류 발생' });
+    }
+    res.clearCookie('connect.sid'); // 쿠키 이름은 설정에 따라 달라질 수 있습니다.
+    return res.json({ success: true });
+  });
 });
