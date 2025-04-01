@@ -1,0 +1,9 @@
+CREATE TABLE base_timetables (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(255) NOT NULL,
+  day VARCHAR(10) NOT NULL,      -- 예: '월', '화', …
+  time INT NOT NULL,             -- 예: 9, 10, 11, …
+  subject VARCHAR(255) NOT NULL,
+  color VARCHAR(20) DEFAULT '#e0f7fa',
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

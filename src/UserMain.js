@@ -6,7 +6,7 @@ function UserMain({ username, gisu }) {
   const navigate = useNavigate();
 
   // 로그아웃 처리 함수
-  const handleLogout = async () => {
+  const handleLogout = async () => {  
     try {
       const res = await fetch('http://localhost:4000/logout', {
         method: 'POST',

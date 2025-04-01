@@ -10,7 +10,6 @@ const path = require('path');
 const upload = require('./uploadConfig'); // /server/uploadConfig.js
 const Tesseract = require('tesseract.js');
 const extractText = require('./ocr');
-const extractTSV = require('./ocrtsv');
 
 const app = express();
 
@@ -48,13 +47,20 @@ const pool = mariadb.createPool({
   connectionLimit: 5
 });
 
-// uploads 폴더가 없는 경우 자동 생성 (선택 사항)
+// uploads 폴더가 없는 경우 자동 생성
 const uploadDir = path.join(__dirname, 'uploads', 'timetables');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// 회원가입 엔드포인트
+/*
+  ※ 데이터베이스 스키마는
+     - 기본 시간표: base_timetables
+     - 주차별 일정: schedule_items
+  로 사전에 생성해두셨다고 가정합니다.
+*/
+
+// ─── 회원가입 ─────────────────────────────────────────────────────────────
 app.post('/register', async (req, res) => {
   const { name, password, phone, part, ST } = req.body;
   if (!name || !password || !phone || !part || !ST) {
@@ -75,7 +81,7 @@ app.post('/register', async (req, res) => {
   }
 });
 
-// 로그인 엔드포인트
+// ─── 로그인 ─────────────────────────────────────────────────────────────
 app.post('/login', async (req, res) => {
   const { name, password } = req.body;
   if (!name || !password) {
@@ -106,7 +112,7 @@ app.post('/login', async (req, res) => {
   }
 });
 
-// 세션 상태 확인 엔드포인트
+// ─── 세션 상태 확인 ─────────────────────────────────────────────────────────────
 app.get('/session', (req, res) => {
   if (req.session.user) {
     res.json({ loggedIn: true, user: req.session.user });
@@ -115,7 +121,7 @@ app.get('/session', (req, res) => {
   }
 });
 
-// 관리자 전용 사용자 등록 엔드포인트
+// ─── 관리자 전용 사용자 관련 엔드포인트 ─────────────────────────────────────────────────────────────
 app.post('/admin/add-user', async (req, res) => {
   const { name, password, phone, part, ST } = req.body;
   if (!name || !password || !phone || !part || !ST) {
@@ -136,7 +142,6 @@ app.post('/admin/add-user', async (req, res) => {
   }
 });
 
-// 관리자 전용 사용자 목록 조회 엔드포인트
 app.get('/admin/users', async (req, res) => {
   try {
     const conn = await pool.getConnection();
@@ -149,7 +154,6 @@ app.get('/admin/users', async (req, res) => {
   }
 });
 
-// 관리자 전용 사용자 삭제 엔드포인트
 app.delete('/admin/users/:name', async (req, res) => {
   const { name } = req.params;
   try {
@@ -166,7 +170,6 @@ app.delete('/admin/users/:name', async (req, res) => {
   }
 });
 
-// 관리자 전용 사용자 수정 엔드포인트
 app.put('/admin/users/:name', async (req, res) => {
   const { name } = req.params;
   const { password, phone, part, ST } = req.body;
@@ -192,7 +195,7 @@ app.put('/admin/users/:name', async (req, res) => {
   }
 });
 
-// 로그아웃 엔드포인트
+// ─── 로그아웃 ─────────────────────────────────────────────────────────────
 app.post('/logout', (req, res) => {
   req.session.destroy((err) => {
     if (err) {
@@ -204,7 +207,7 @@ app.post('/logout', (req, res) => {
   });
 });
 
-// 시간표 업로드 엔드포인트
+// ─── 시간표 업로드 및 조회 관련 엔드포인트 ─────────────────────────────────────────────────────────────
 app.post('/upload-timetable', upload.single('timetable'), async (req, res) => {
   try {
     const filePath = req.file.path;
@@ -229,10 +232,9 @@ app.post('/upload-timetable', upload.single('timetable'), async (req, res) => {
       });
     }
 
-    // TSV 데이터 추출
-    const tsvData = await extractTSV(filePath);
+    // OCR 처리 후 TSV 데이터 추출
+    const tsvData = await extractText(filePath);
 
-    // DB에 저장 (timetables 테이블의 extractedText 필드에 TSV 데이터 저장)
     const conn = await pool.getConnection();
     await conn.query(
       'INSERT INTO timetables (username, filePath, extractedText) VALUES (?, ?, ?)',
@@ -252,7 +254,6 @@ app.post('/upload-timetable', upload.single('timetable'), async (req, res) => {
   }
 });
 
-// 시간표 파일 조회 엔드포인트
 app.get('/get-timetable', (req, res) => {
   if (!req.session.user) {
     return res.status(401).json({ error: '로그인이 필요합니다.' });
@@ -268,7 +269,6 @@ app.get('/get-timetable', (req, res) => {
   }
 });
 
-// 사용자 시간표 데이터 조회 엔드포인트
 app.get('/user/timetable-data', async (req, res) => {
   if (!req.session.user) {
     return res.status(401).json({ error: '로그인이 필요합니다.' });
@@ -285,6 +285,137 @@ app.get('/user/timetable-data', async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: '시간표 데이터를 불러오지 못했습니다.' });
+  }
+});
+
+// ─── [추가] 관리자 전용 기본 시간표 관리 API ─────────────────────────────────────────────
+// GET /api/base-timetable?username=optional
+// - 관리자: 쿼리스트링에 username이 있으면 해당 사용자의 기본 시간표 조회
+// - 일반 사용자: 자신의 기본 시간표 조회
+app.get('/api/base-timetable', async (req, res) => {
+  if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
+  const currentUser = req.session.user;
+  let targetUsername = currentUser.name;
+  if (currentUser.isAdmin && req.query.username) {
+    targetUsername = req.query.username;
+  }
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const rows = await conn.query(
+      'SELECT * FROM base_timetables WHERE username = ? ORDER BY day, time',
+      [targetUsername]
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+// POST /api/base-timetable - 관리자 전용, 대상 사용자의 기본 시간표 업데이트
+// 요청 본문 예시: { username, timetable: [ { day, time, subject, color }, ... ] }
+app.post('/api/base-timetable', async (req, res) => {
+  if (!req.session.user || !req.session.user.isAdmin) {
+    return res.status(401).json({ error: '관리자 권한이 필요합니다.' });
+  }
+  const { username, timetable } = req.body;
+  if (!username || !Array.isArray(timetable)) {
+    return res.status(400).json({ error: 'username과 timetable 배열이 필요합니다.' });
+  }
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    // 대상 사용자의 기존 기본 시간표 삭제
+    await conn.query('DELETE FROM base_timetables WHERE username = ?', [username]);
+    const insertQuery = 'INSERT INTO base_timetables (username, day, time, subject, color) VALUES (?, ?, ?, ?, ?)';
+    for (const item of timetable) {
+      await conn.query(insertQuery, [username, item.day, item.time, item.subject, item.color || '#e0f7fa']);
+    }
+    res.json({ message: '기본 시간표가 업데이트되었습니다.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+// ─── [추가] 사용자 주차별 일정 관리 API ─────────────────────────────────────────────
+// GET /api/schedule
+// - 로그인한 사용자의 모든 주차별 일정 조회 (week_start, day, time 순 정렬)
+app.get('/api/schedule', async (req, res) => {
+  if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
+  const username = req.session.user.name;
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const rows = await conn.query(
+      'SELECT * FROM schedule_items WHERE username = ? ORDER BY week_start, day, time',
+      [username]
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+// POST /api/schedule
+// - 로그인한 사용자의 일정 데이터를 특정 주(week_start)를 기준으로 업데이트 (삭제 후 재삽입)
+// 요청 본문 예시: { week_start: "2025-04-21", scheduleItems: [ { day, time, subject, color }, ... ] }
+app.post('/api/schedule', async (req, res) => {
+  if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
+  const username = req.session.user.name;
+  const { week_start, scheduleItems } = req.body;
+  if (!week_start || !Array.isArray(scheduleItems)) {
+    return res.status(400).json({ error: 'week_start와 scheduleItems 배열이 필요합니다.' });
+  }
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    // 해당 사용자의 해당 주 일정 삭제
+    await conn.query('DELETE FROM schedule_items WHERE username = ? AND week_start = ?', [username, week_start]);
+    const insertQuery = 'INSERT INTO schedule_items (username, week_start, day, time, subject, color) VALUES (?, ?, ?, ?, ?, ?)';
+    for (const item of scheduleItems) {
+      await conn.query(insertQuery, [
+        username,
+        week_start,
+        item.day,
+        item.time,
+        item.subject,
+        item.color || '#e0f7fa'
+      ]);
+    }
+    res.json({ message: '주차별 일정이 업데이트되었습니다.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+// DELETE /api/schedule/:id - 로그인한 사용자의 특정 일정 항목 삭제
+app.delete('/api/schedule/:id', async (req, res) => {
+  if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
+  const username = req.session.user.name;
+  const id = req.params.id;
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const result = await conn.query(
+      'DELETE FROM schedule_items WHERE id = ? AND username = ?',
+      [id, username]
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: '해당 일정이 존재하지 않거나 삭제 권한이 없습니다.' });
+    }
+    res.json({ message: '일정이 삭제되었습니다.', id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    if (conn) conn.release();
   }
 });
 
