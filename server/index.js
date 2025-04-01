@@ -9,12 +9,12 @@ const fs = require('fs');
 const path = require('path');
 const upload = require('./uploadConfig'); // /server/uploadConfig.js
 const Tesseract = require('tesseract.js');
-// OCR 모듈(예: server/ocr.js 파일을 작성해두었다면)
 const extractText = require('./ocr');
+const extractTSV = require('./ocrtsv');
 
 const app = express();
 
-// 정적 파일 미들웨어는 라우트 정의 전에 등록 (중복 제거)
+// 정적 파일 미들웨어는 라우트 정의 전에 등록
 app.use('/uploads', express.static('uploads'));
 
 app.use(cookieParser());
@@ -229,14 +229,14 @@ app.post('/upload-timetable', upload.single('timetable'), async (req, res) => {
       });
     }
 
-    // OCR 처리
-    const extractedText = await extractText(filePath);
+    // TSV 데이터 추출
+    const tsvData = await extractTSV(filePath);
 
-    // DB에 저장 (timetables 테이블)
+    // DB에 저장 (timetables 테이블의 extractedText 필드에 TSV 데이터 저장)
     const conn = await pool.getConnection();
     await conn.query(
       'INSERT INTO timetables (username, filePath, extractedText) VALUES (?, ?, ?)',
-      [req.session.user ? req.session.user.name : 'unknown', filePath, extractedText]
+      [req.session.user ? req.session.user.name : 'unknown', filePath, tsvData]
     );
     conn.release();
 
@@ -244,7 +244,7 @@ app.post('/upload-timetable', upload.single('timetable'), async (req, res) => {
       success: true, 
       message: '시간표 업로드 및 OCR 처리 성공', 
       filePath, 
-      extractedText 
+      extractedText: tsvData
     });
   } catch (err) {
     console.error(err);

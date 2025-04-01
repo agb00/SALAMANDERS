@@ -1,73 +1,88 @@
 // src/Timetable.js
-import React from "react";
+import React from 'react';
 
-function Timetable({ days, times, scheduleItems }) {
-  // 각 칸(day, time)에 해당하는 수업 정보를 찾는 함수
-  const getItemForDayTime = (day, time) => {
-    return scheduleItems.find(item => item.day === day && item.time === time);
-  };
-
+function Timetable({ days, times, scheduleItems, onCellClick, selectedCells }) {
   return (
-    <table style={styles.table}>
-      <thead>
-        <tr>
-          <th style={styles.th}>시간</th>
-          {days.map(day => (
-            <th key={day} style={styles.th}>{day}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {times.map(time => (
-          <tr key={time}>
-            <td style={styles.timeTd}>{time}</td>
-            {days.map(day => {
-              const item = getItemForDayTime(day, time);
-              return (
-                <td
-                  key={day}
-                  style={{
-                    ...styles.td,
-                    backgroundColor: item ? item.color : "#fff",
-                  }}
-                >
-                  {item ? item.subject : ""}
-                </td>
-              );
-            })}
+    // 테이블이 컨테이너 너비를 넘어가면 가로 스크롤 가능하도록 감싸기
+    <div style={{ overflowX: 'auto', width: '100%' }}>
+      <table style={tableStyles.table}>
+        <thead>
+          <tr>
+            <th style={tableStyles.headerCell}></th>
+            {days.map(day => (
+              <th key={day} style={tableStyles.headerCell}>{day}</th>
+            ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {times.map(time => (
+            <tr key={time}>
+              <td style={tableStyles.timeCell}>{time}</td>
+              {days.map(day => {
+                // 해당 시간대와 요일의 일정 찾기
+                const scheduleItem = scheduleItems.find(item => item.day === day && item.time === time);
+                // 선택된 셀 여부 확인
+                const isSelected = selectedCells.some(cell => cell.day === day && cell.time === time);
+                return (
+                  <td
+                    key={`${day}-${time}`}
+                    onClick={() => onCellClick(day, time, scheduleItem)}
+                    style={{
+                      ...tableStyles.cell,
+                      backgroundColor: isSelected
+                        ? "#ffeb3b"  // 선택된 셀의 색상 (노란색)
+                        : scheduleItem 
+                          ? scheduleItem.color 
+                          : "#fff"
+                    }}
+                  >
+                    {scheduleItem ? scheduleItem.subject : ''}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
-const styles = {
+const tableStyles = {
   table: {
-    borderCollapse: "collapse",
-    width: "100%",
-    marginTop: "20px"
+    borderCollapse: 'collapse',
+    width: '100%',
+    marginBottom: '20px',
+    tableLayout: 'fixed', // 셀 크기를 균등하게 분배
   },
-  th: {
-    border: "1px solid #ccc",
-    padding: "2px", // 패딩을 4px로 축소
-    backgroundColor: "#f2f2f2",
-    textAlign: "center"
+  headerCell: {
+    border: '1px solid #ccc',
+    padding: '2px',         // 패딩 최소화
+    backgroundColor: '#f5f5f5',
+    textAlign: 'center',
+    fontSize: '0.8rem',      
+    minWidth: '40px',        
+    minHeight: '30px',       
   },
-  timeTd: {
-    border: "1px solid #ccc",
-    padding: "2px", // 패딩 축소
-    backgroundColor: "#fafafa",
-    textAlign: "center",
-    width: "60px"
+  timeCell: {
+    border: '1px solid #ccc',
+    padding: '2px',         // 패딩 최소화
+    textAlign: 'center',
+    backgroundColor: '#f5f5f5',
+    fontWeight: 'bold',
+    fontSize: '0.8rem',      
+    minWidth: '40px',        
+    minHeight: '30px',       
   },
-  td: {
-    border: "1px solid #ccc",
-    padding: "2px", // 패딩 축소
-    textAlign: "center",
-    height: "50px",
-    width: "100px"
-  }
+  cell: {
+    border: '1px solid #ccc',
+    padding: '2px',         // 패딩 최소화
+    textAlign: 'center',
+    cursor: 'pointer',
+    minWidth: '60px',
+    minHeight: '40px',
+    wordWrap: 'break-word',
+  },
 };
 
 export default Timetable;
