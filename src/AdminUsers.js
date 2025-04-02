@@ -1,6 +1,47 @@
 // src/AdminUsers.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Timetable from './Timetable';
+
+function UserBaseSchedule({ username }) {
+  const [baseTimetable, setBaseTimetable] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // GET /api/base-timetable?username=xxx 로 기본 시간표 데이터 조회
+  useEffect(() => {
+    if (!username) return;
+    setLoading(true);
+    fetch(`http://localhost:4000/api/base-timetable?username=${username}`, {
+      credentials: 'include'
+    })
+      .then(res => {
+        if (!res.ok) throw new Error("기본 시간표 데이터를 불러오지 못했습니다.");
+        return res.json();
+      })
+      .then(data => {
+        // 데이터가 없으면 빈 배열을 사용하여 빈 시간표로 표시됨
+        setBaseTimetable(data && data.length > 0 ? data : []);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message);
+        setLoading(false);
+      });
+  }, [username]);
+
+  const days = ["월", "화", "수", "목", "금", "토", "일"];
+  const times = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
+
+  if (loading) return <p>로딩 중...</p>;
+  if (error) return <p>오류: {error}</p>;
+
+  return (
+    <div>
+      <Timetable days={days} times={times} scheduleItems={baseTimetable} />
+    </div>
+  );
+}
 
 function AdminUsers() {
   const [users, setUsers] = useState([]);
@@ -8,6 +49,7 @@ function AdminUsers() {
   const [error, setError] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editUser, setEditUser] = useState(null); // 수정할 사용자를 저장
+  const [selectedUserForSchedule, setSelectedUserForSchedule] = useState(null); // 시간표 관리 모달에서 선택된 사용자
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -119,6 +161,7 @@ function AdminUsers() {
               <th style={thStyle}>파트</th>
               <th style={thStyle}>기수</th>
               <th style={thStyle}>액션</th>
+              <th style={thStyle}>시간표 관리</th>
             </tr>
           </thead>
           <tbody>
@@ -137,10 +180,35 @@ function AdminUsers() {
                     삭제
                   </button>
                 </td>
+                <td style={tdStyle}>
+                  <button
+                    onClick={() => setSelectedUserForSchedule(user)}
+                    style={actionButtonStyle}
+                  >
+                    시간표 관리
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+      )}
+
+      {/* 시간표 관리 모달: 선택한 유저의 기본 시간표를 조회하여 보여줌 */}
+      {selectedUserForSchedule && (
+        <div style={modalOverlayStyle}>
+          <div style={modalContentStyle}>
+            <h3 style={{ marginBottom: '20px', textAlign: 'center' }}>
+              {selectedUserForSchedule.name}의 기본 시간표
+            </h3>
+            <UserBaseSchedule username={selectedUserForSchedule.name} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+              <button onClick={() => setSelectedUserForSchedule(null)} style={modalCancelButtonStyle}>
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 추가 모달 */}
@@ -217,31 +285,17 @@ const modalContentStyle = {
   padding: '30px',
   borderRadius: '8px',
   boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-  width: '400px',
+  width: '600px',
   maxWidth: '90%',
 };
 
-const inputStyle = {
-  width: '100%',
-  padding: '10px',
-  margin: '8px 0',
-  border: '1px solid #ccc',
-  borderRadius: '4px',
-};
-
-const modalButtonStyle = {
+const modalCancelButtonStyle = {
   padding: '10px 20px',
-  backgroundColor: '#4CAF50',
+  backgroundColor: '#f44336',
   color: '#fff',
   border: 'none',
   borderRadius: '4px',
   cursor: 'pointer',
-};
-
-const modalCancelButtonStyle = {
-  ...modalButtonStyle,
-  backgroundColor: '#f44336',
-  marginRight: '10px',
 };
 
 // 새 사용자 등록 모달 컴포넌트
@@ -268,20 +322,20 @@ function AddUserModal({ onClose, onAdd }) {
         <h3 style={{ marginBottom: '20px', textAlign: 'center' }}>새 사용자 등록</h3>
         <form onSubmit={handleSubmit}>
           <label>이름:</label>
-          <input style={inputStyle} type="text" value={name} onChange={(e) => setName(e.target.value)} />
+          <input style={{ width: '100%', padding: '10px', margin: '8px 0', border: '1px solid #ccc', borderRadius: '4px' }} type="text" value={name} onChange={(e) => setName(e.target.value)} />
           <label>비밀번호:</label>
-          <input style={inputStyle} type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input style={{ width: '100%', padding: '10px', margin: '8px 0', border: '1px solid #ccc', borderRadius: '4px' }} type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
           <label>전화번호:</label>
-          <input style={inputStyle} type="text" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <input style={{ width: '100%', padding: '10px', margin: '8px 0', border: '1px solid #ccc', borderRadius: '4px' }} type="text" value={phone} onChange={(e) => setPhone(e.target.value)} />
           <label>파트:</label>
-          <input style={inputStyle} type="text" value={part} onChange={(e) => setPart(e.target.value)} />
+          <input style={{ width: '100%', padding: '10px', margin: '8px 0', border: '1px solid #ccc', borderRadius: '4px' }} type="text" value={part} onChange={(e) => setPart(e.target.value)} />
           <label>ST:</label>
-          <input style={inputStyle} type="text" value={ST} onChange={(e) => setST(e.target.value)} />
+          <input style={{ width: '100%', padding: '10px', margin: '8px 0', border: '1px solid #ccc', borderRadius: '4px' }} type="text" value={ST} onChange={(e) => setST(e.target.value)} />
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
             <button type="button" onClick={onClose} style={modalCancelButtonStyle}>
               취소
             </button>
-            <button type="submit" style={modalButtonStyle}>
+            <button type="submit" style={{ padding: '10px 20px', backgroundColor: '#4CAF50', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
               등록
             </button>
           </div>
@@ -300,7 +354,7 @@ function EditUserModal({ user, onClose, onUpdate }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const updatedUser = { name: user.name, password, phone, part, ST};
+    const updatedUser = { name: user.name, password, phone, part, ST };
     await onUpdate(updatedUser);
   };
 
@@ -310,26 +364,26 @@ function EditUserModal({ user, onClose, onUpdate }) {
         <h3 style={{ marginBottom: '20px', textAlign: 'center' }}>사용자 수정</h3>
         <form onSubmit={handleSubmit}>
           <label>이름:</label>
-          <input style={{ ...inputStyle, backgroundColor: '#f2f2f2' }} type="text" value={user.name} readOnly />
+          <input style={{ width: '100%', padding: '10px', margin: '8px 0', border: '1px solid #ccc', borderRadius: '4px', backgroundColor: '#f2f2f2' }} type="text" value={user.name} readOnly />
           <label>비밀번호:</label>
           <input
-            style={inputStyle}
+            style={{ width: '100%', padding: '10px', margin: '8px 0', border: '1px solid #ccc', borderRadius: '4px' }}
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="변경 시 입력 (비워두면 기존 비밀번호 유지)"
           />
           <label>전화번호:</label>
-          <input style={inputStyle} type="text" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <input style={{ width: '100%', padding: '10px', margin: '8px 0', border: '1px solid #ccc', borderRadius: '4px' }} type="text" value={phone} onChange={(e) => setPhone(e.target.value)} />
           <label>파트:</label>
-          <input style={inputStyle} type="text" value={part} onChange={(e) => setPart(e.target.value)} />
+          <input style={{ width: '100%', padding: '10px', margin: '8px 0', border: '1px solid #ccc', borderRadius: '4px' }} type="text" value={part} onChange={(e) => setPart(e.target.value)} />
           <label>기수:</label>
-          <input style={inputStyle} type="text" value={ST} onChange={(e) => setST(e.target.value)} />
+          <input style={{ width: '100%', padding: '10px', margin: '8px 0', border: '1px solid #ccc', borderRadius: '4px' }} type="text" value={ST} onChange={(e) => setST(e.target.value)} />
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
             <button type="button" onClick={onClose} style={modalCancelButtonStyle}>
               취소
             </button>
-            <button type="submit" style={modalButtonStyle}>
+            <button type="submit" style={{ padding: '10px 20px', backgroundColor: '#4CAF50', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
               수정
             </button>
           </div>

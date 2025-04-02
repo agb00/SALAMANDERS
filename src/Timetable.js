@@ -1,7 +1,6 @@
-// src/Timetable.js
 import React from 'react';
 
-function Timetable({ days, times, scheduleItems, onCellClick, selectedCells }) {
+function Timetable({ days, times, scheduleItems, onCellClick, selectedCells = [] }) {
   return (
     // 테이블이 컨테이너 너비를 넘어가면 가로 스크롤 가능하도록 감싸기
     <div style={{ overflowX: 'auto', width: '100%' }}>
@@ -21,7 +20,7 @@ function Timetable({ days, times, scheduleItems, onCellClick, selectedCells }) {
               {days.map(day => {
                 // 해당 시간대와 요일의 일정 찾기
                 const scheduleItem = scheduleItems.find(item => item.day === day && item.time === time);
-                // 선택된 셀 여부 확인
+                // 선택된 셀 여부 확인 (selectedCells의 기본값을 빈 배열로 설정)
                 const isSelected = selectedCells.some(cell => cell.day === day && cell.time === time);
                 return (
                   <td

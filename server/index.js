@@ -99,7 +99,7 @@ app.post('/login', async (req, res) => {
     if (!match) {
       return res.status(401).json({ error: '비밀번호가 일치하지 않습니다.' });
     }
-    // 로그인 성공 시, 세션에 사용자 정보 저장 (ST 컬럼 추가)
+    // 로그인 성공 시, 세션에 사용자 정보 저장 (ST 컬럼 포함)
     req.session.user = {
       name: user.name,
       isAdmin: user.name.toLowerCase() === 'sala',
@@ -125,7 +125,7 @@ app.get('/session', (req, res) => {
 app.post('/admin/add-user', async (req, res) => {
   const { name, password, phone, part, ST } = req.body;
   if (!name || !password || !phone || !part || !ST) {
-    return res.status(400).json({ error: '모든 필드를 입력하세요.' });
+    return res.status(400).json({ error: '모든 필드를 입력하세요.' });  
   }
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -288,10 +288,53 @@ app.get('/user/timetable-data', async (req, res) => {
   }
 });
 
+// ─── [추가] 사용자 시간표 조회 엔드포인트 ─────────────────────────────────────────────
+// GET /admin/users/:userId/schedule
+// 1. 먼저 schedule_items 테이블에서 오늘이 포함된 주(월~일)의 데이터 조회
+// 2. 데이터가 없으면 base_timetables 테이블에서 해당 사용자의 기본 시간표 조회
+// 3. 둘 다 없으면 빈 배열 반환
+app.get('/admin/users/:userId/schedule', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    // 현재 주(월요일 ~ 일요일)의 시작일과 종료일 계산
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const diff = dayOfWeek === 0 ? today.getDate() - 6 : today.getDate() - dayOfWeek + 1;
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(diff);
+    startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+    
+    const conn = await pool.getConnection();
+    // 1. schedule_items 테이블에서 해당 주의 데이터 조회 (user_id와 date 컬럼 사용)
+    const scheduleItems = await conn.query(
+      'SELECT * FROM schedule_items WHERE user_id = ? AND date BETWEEN ? AND ?',
+      [userId, startOfWeek, endOfWeek]
+    );
+    if (scheduleItems.length > 0) {
+      conn.release();
+      return res.json(scheduleItems);
+    }
+    // 2. 데이터가 없으면 base_timetables 테이블에서 기본 시간표 조회 (username 컬럼 사용)
+    const baseTimetable = await conn.query(
+      'SELECT * FROM base_timetables WHERE username = ?',
+      [userId]
+    );
+    conn.release();
+    if (baseTimetable.length > 0) {
+      return res.json(baseTimetable);
+    }
+    // 3. 두 테이블 모두 데이터가 없으면 빈 배열 반환
+    return res.json([]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '서버 에러' });
+  }
+});
+
 // ─── [추가] 관리자 전용 기본 시간표 관리 API ─────────────────────────────────────────────
-// GET /api/base-timetable?username=optional
-// - 관리자: 쿼리스트링에 username이 있으면 해당 사용자의 기본 시간표 조회
-// - 일반 사용자: 자신의 기본 시간표 조회
 app.get('/api/base-timetable', async (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
   const currentUser = req.session.user;
@@ -315,7 +358,6 @@ app.get('/api/base-timetable', async (req, res) => {
 });
 
 // POST /api/base-timetable - 관리자 전용, 대상 사용자의 기본 시간표 업데이트
-// 요청 본문 예시: { username, timetable: [ { day, time, subject, color }, ... ] }
 app.post('/api/base-timetable', async (req, res) => {
   if (!req.session.user || !req.session.user.isAdmin) {
     return res.status(401).json({ error: '관리자 권한이 필요합니다.' });
@@ -342,8 +384,6 @@ app.post('/api/base-timetable', async (req, res) => {
 });
 
 // ─── [추가] 사용자 주차별 일정 관리 API ─────────────────────────────────────────────
-// GET /api/schedule
-// - 로그인한 사용자의 모든 주차별 일정 조회 (week_start, day, time 순 정렬)
 app.get('/api/schedule', async (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
   const username = req.session.user.name;
@@ -362,9 +402,6 @@ app.get('/api/schedule', async (req, res) => {
   }
 });
 
-// POST /api/schedule
-// - 로그인한 사용자의 일정 데이터를 특정 주(week_start)를 기준으로 업데이트 (삭제 후 재삽입)
-// 요청 본문 예시: { week_start: "2025-04-21", scheduleItems: [ { day, time, subject, color }, ... ] }
 app.post('/api/schedule', async (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
   const username = req.session.user.name;
@@ -375,7 +412,6 @@ app.post('/api/schedule', async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
-    // 해당 사용자의 해당 주 일정 삭제
     await conn.query('DELETE FROM schedule_items WHERE username = ? AND week_start = ?', [username, week_start]);
     const insertQuery = 'INSERT INTO schedule_items (username, week_start, day, time, subject, color) VALUES (?, ?, ?, ?, ?, ?)';
     for (const item of scheduleItems) {
@@ -396,7 +432,6 @@ app.post('/api/schedule', async (req, res) => {
   }
 });
 
-// DELETE /api/schedule/:id - 로그인한 사용자의 특정 일정 항목 삭제
 app.delete('/api/schedule/:id', async (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
   const username = req.session.user.name;
