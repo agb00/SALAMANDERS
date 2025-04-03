@@ -12,8 +12,9 @@ function UserSchedule() {
   const [newSubject, setNewSubject] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [currentWeekStart, setCurrentWeekStart] = useState('');
+  const [repeatWeekly, setRepeatWeekly] = useState(false); // 매주 반복 체크박스 상태
 
-  // 현지 날짜 기준으로 "YYYY-MM-DD" 형식의 주 시작일(월요일) 계산 함수
+  // 현지 날짜 기준 "YYYY-MM-DD" 형식의 주 시작일(월요일) 계산 함수
   const calculateWeekStartLocal = (date) => {
     const dayOfWeek = date.getDay(); // 일:0, 월:1, …, 토:6
     const diff = dayOfWeek === 0 ? date.getDate() - 6 : date.getDate() - dayOfWeek + 1;
@@ -29,7 +30,9 @@ function UserSchedule() {
   // 컴포넌트 마운트 시 오늘이 포함된 주의 시작일(월요일) 설정
   useEffect(() => {
     const today = new Date();
-    setCurrentWeekStart(calculateWeekStartLocal(today));
+    const weekStartLocal = calculateWeekStartLocal(today);
+    console.log("계산된 주 시작일 (KST 기준):", weekStartLocal);
+    setCurrentWeekStart(weekStartLocal);
   }, []);
 
   // 일정 데이터 불러오기: 우선 schedule_items, 없으면 base_timetables, 없으면 빈 배열
@@ -44,13 +47,14 @@ function UserSchedule() {
         return res.json();
       })
       .then(data => {
-        // week_start 값을 현지 날짜 형식(YYYY-MM-DD)으로 변환하여 비교
+        // week_start 값을 KST 기준으로 변환하여 비교
         const currentWeekItems = data.filter(item => {
           if (!item.week_start) return false;
           const itemDate = new Date(item.week_start);
+          // KST: UTC+9
+          itemDate.setHours(itemDate.getHours() + 9);
           const formattedItemDate = `${itemDate.getFullYear()}-${(itemDate.getMonth() + 1)
-            .toString()
-            .padStart(2, '0')}-${itemDate.getDate().toString().padStart(2, '0')}`;
+            .toString().padStart(2, '0')}-${itemDate.getDate().toString().padStart(2, '0')}`;
           return formattedItemDate === currentWeekStart;
         });
         if (currentWeekItems.length > 0) {
@@ -120,6 +124,7 @@ function UserSchedule() {
         updatedItems.push(newItem);
       }
     });
+    // schedule_items 업데이트 (POST /api/schedule)
     fetch('http://localhost:4000/api/schedule', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -135,6 +140,24 @@ function UserSchedule() {
         setSelectedCells([]);
         setNewSubject('');
         setModalOpen(false);
+        // 매주 반복 체크 시 기본 시간표(base_timetables)에도 저장
+        if (repeatWeekly) {
+          fetch('http://localhost:4000/api/base-timetable', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            // username는 schedule_items에 저장된 첫 항목의 username 사용(또는 세션에서 가져올 수 있음)
+            body: JSON.stringify({ username: updatedItems.length > 0 ? updatedItems[0].username : "", timetable: updatedItems })
+          })
+            .then(res => {
+              if (!res.ok) throw new Error("기본 시간표 저장에 실패했습니다.");
+              return res.json();
+            })
+            .then(baseRes => {
+              console.log("기본 시간표 업데이트:", baseRes);
+            })
+            .catch(err => alert(err.message));
+        }
       })
       .catch(err => alert(err.message));
   };
@@ -150,14 +173,13 @@ function UserSchedule() {
   const goToPreviousWeek = () => {
     const currentDate = new Date(currentWeekStart);
     currentDate.setDate(currentDate.getDate() - 7);
-    // currentDate를 로컬 날짜 형식으로 변환
-    setCurrentWeekStart(`${currentDate.getFullYear()}-${(currentDate.getMonth()+1).toString().padStart(2, '0')}-${currentDate.getDate().toString().padStart(2, '0')}`);
+    setCurrentWeekStart(`${currentDate.getFullYear()}-${(currentDate.getMonth()+1).toString().padStart(2,'0')}-${currentDate.getDate().toString().padStart(2,'0')}`);
   };
 
   const goToNextWeek = () => {
     const currentDate = new Date(currentWeekStart);
     currentDate.setDate(currentDate.getDate() + 7);
-    setCurrentWeekStart(`${currentDate.getFullYear()}-${(currentDate.getMonth()+1).toString().padStart(2, '0')}-${currentDate.getDate().toString().padStart(2, '0')}`);
+    setCurrentWeekStart(`${currentDate.getFullYear()}-${(currentDate.getMonth()+1).toString().padStart(2,'0')}-${currentDate.getDate().toString().padStart(2,'0')}`);
   };
 
   if (loading) return <p>로딩 중...</p>;
@@ -166,11 +188,12 @@ function UserSchedule() {
   return (
     <div style={styles.container}>
       <h2 style={styles.title}>나의 일정 관리</h2>
-      <div style={{ marginBottom: '10px' }}>
+      <div style={{ textAlign: 'center', marginBottom: '10px' }}>
         <button onClick={goToPreviousWeek} style={navButtonStyle}>이전 주</button>
         <span style={{ margin: '0 10px' }}>주 시작일: {currentWeekStart}</span>
         <button onClick={goToNextWeek} style={navButtonStyle}>다음 주</button>
       </div>
+
       <Timetable
         days={days}
         times={times}
@@ -218,6 +241,23 @@ function UserSchedule() {
                 ))}
               </ul>
             </div>
+            
+
+            
+            {/* 매주 반복 체크박스 추가 }
+            <div style={{ marginBottom: '10px' }}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={repeatWeekly}
+                  onChange={(e) => setRepeatWeekly(e.target.checked)}
+                  style={{ marginRight: '5px' }}
+                />
+                매주 반복
+              </label>
+            </div>
+            */}
+
             <form onSubmit={handleModalSubmit}>
               <input
                 type="text"

@@ -454,6 +454,79 @@ app.delete('/api/schedule/:id', async (req, res) => {
   }
 });
 
+// ─── [추가] 해당 시간에 일정이 없는 사용자 목록 API ─────────────────────────────
+// GET /api/available-users?day=월&time=11&week_start=YYYY-MM-DD (week_start는 선택사항)
+app.get('/api/available-users', async (req, res) => {
+  if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
+  
+  const { day, time, week_start } = req.query;
+  if (!day || !time) {
+    return res.status(400).json({ error: 'day와 time 파라미터가 필요합니다.' });
+  }
+  
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    // 모든 사용자 이름을 조회 (필요한 경우 다른 정보도 함께 조회)
+    const users = await conn.query('SELECT name FROM users');
+    // 해당 day, time, (선택적으로 week_start) 에 일정이 있는 사용자 조회
+    let query = 'SELECT username FROM schedule_items WHERE day = ? AND time = ?';
+    let params = [day, time];
+    if (week_start) {
+      query += ' AND week_start = ?';
+      params.push(week_start);
+    }
+    const busyUsers = await conn.query(query, params);
+    const busyUsernames = busyUsers.map(u => u.username);
+    // available users: users not in busyUsernames
+    const availableUsers = users.filter(user => !busyUsernames.includes(user.name));
+    res.json(availableUsers);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+// 팀 생성 API 추가
+app.post('/admin/create-team', async (req, res) => {
+  const { teamName, users } = req.body;
+
+  if (!teamName || !users || users.length === 0) {
+    return res.status(400).json({ error: '팀 이름과 유저 목록을 입력하세요.' });
+  }
+
+  try {
+    const conn = await pool.getConnection();
+
+    // 팀 생성
+    const result = await conn.query('INSERT INTO teams (name, users) VALUES (?, ?)', [
+      teamName,
+      JSON.stringify(users), // 유저 목록을 JSON 형식으로 저장
+    ]);
+
+    const teamId = result.insertId; // 생성된 팀의 ID
+
+    // 유저-팀 관계 저장 (user_teams 테이블에 유저와 팀을 연결)
+    for (const userName of users) {
+      const userResult = await conn.query('SELECT id FROM users WHERE name = ?', [userName]);
+      if (userResult.length === 0) {
+        continue; // 유저가 존재하지 않으면 무시
+      }
+
+      const userId = userResult[0].id;
+      await conn.query('INSERT INTO user_teams (user_id, team_id) VALUES (?, ?)', [userId, teamId]);
+    }
+
+    conn.release();
+    res.json({ success: true, message: '팀이 생성되었습니다.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '팀 생성 중 오류가 발생했습니다.' });
+  }
+});
+
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`✅ 서버가 포트 ${PORT}에서 실행 중입니다`);

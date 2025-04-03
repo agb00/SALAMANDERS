@@ -77,6 +77,7 @@ const tableStyles = {
     border: '1px solid #ccc',
     padding: '2px',         // 패딩 최소화
     textAlign: 'center',
+    fontSize: '0.8rem',
     cursor: 'pointer',
     minWidth: '60px',
     minHeight: '40px',

@@ -28,4 +28,3 @@ export function parseTimetable(ocrText) {
   
     return scheduleItems;
   }
-  

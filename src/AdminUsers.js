@@ -309,7 +309,21 @@ function AdminUsers() {
             <h3 style={{ marginBottom: '20px', textAlign: 'center' }}>
               {selectedUserForSchedule.name}의 기본 시간표
             </h3>
-            <UserBaseSchedule username={selectedUserForSchedule.name} />
+            <div style={{ display: 'flex', gap: '20px' }}>
+              {/* 왼쪽: 업로드된 시간표 이미지 추가 */}
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <img
+                  src={`http://localhost:4000/uploads/timetables/${encodeURIComponent(selectedUserForSchedule.name)}.jpg`}
+                  alt="업로드된 시간표"
+                  style={{ maxWidth: '100%' }}
+                  onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }}
+                />
+              </div>
+              {/* 오른쪽: 기존 UserBaseSchedule 컴포넌트 */}
+              <div style={{ flex: 1 }}>
+                <UserBaseSchedule username={selectedUserForSchedule.name} />
+              </div>
+            </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
               <button onClick={() => setSelectedUserForSchedule(null)} style={modalCancelButtonStyle}>
                 닫기
@@ -393,7 +407,7 @@ const modalContentStyle = {
   padding: '30px',
   borderRadius: '8px',
   boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-  width: '600px',
+  width: '1200px',
   maxWidth: '90%',
 };
 
@@ -553,4 +567,3 @@ function EditUserModal({ user, onClose, onUpdate }) {
 }
 
 export default AdminUsers;
-  

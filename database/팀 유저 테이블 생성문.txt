@@ -1,0 +1,7 @@
+CREATE TABLE teams_users (
+  team_id INT NOT NULL,
+  username VARCHAR(255) NOT NULL,
+  PRIMARY KEY (team_id, username),
+  FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+  FOREIGN KEY (username) REFERENCES users(name) ON DELETE CASCADE
+);
