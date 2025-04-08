@@ -25,7 +25,7 @@ function UserMain({ username, gisu }) {
 
   return (
     <div style={{ padding: '40px', maxWidth: '600px', margin: '0 auto' }}>
-      <h2>📋 {gisu} {username}</h2>
+      <h2> 🦎 {gisu} {username}</h2>
       <p>원하는 항목을 선택하여 사용 기능을 이용하세요.</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '30px' }}>
         <button onClick={() => navigate('/user/timetable')} style={btnStyle}>
@@ -35,10 +35,7 @@ function UserMain({ username, gisu }) {
           📅 일정 관리
         </button>
         <button onClick={() => navigate('/user/practice')} style={btnStyle}>
-          🏋️‍♀️ 연습 일정
-        </button>
-        <button onClick={() => navigate('/user/team')} style={btnStyle}>
-          🧑‍🤝‍🧑 팀 관리
+          🦎 셀레 일정
         </button>
         <button onClick={handleLogout} style={btnStyle}>
           🔒 로그아웃

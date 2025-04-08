@@ -8,163 +8,294 @@ function AdminSchedule() {
   const [scheduleItems, setScheduleItems] = useState([]); // 주간 연습 일정 데이터
   const [currentWeekStart, setCurrentWeekStart] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);  // 삭제 모달 상태
   const [selectedSlot, setSelectedSlot] = useState({ day: '', time: null });
-  const [availableUsers, setAvailableUsers] = useState([]);
-  const [selectedUsers, setSelectedUsers] = useState({}); // 객체로 수정: 유저별 선택 상태를 저장
+  const [availableTeams, setAvailableTeams] = useState([]); // 가능한 팀들
+  const [selectedTeams, setSelectedTeams] = useState([]); // 선택된 팀들
+  const [allTeams, setAllTeams] = useState([]); // 전체 팀 목록
+  const [selectedScheduleItem, setSelectedScheduleItem] = useState(null); // 삭제할 일정
 
   // 현지 날짜 기준 "YYYY-MM-DD" 형식의 주 시작일(월요일) 계산 함수
   const calculateWeekStartLocal = (date) => {
-    const dayOfWeek = date.getDay(); // 일:0, 월:1, …, 토:6
-    const diff = dayOfWeek === 0 ? date.getDate() - 6 : date.getDate() - dayOfWeek + 1;
-    const weekStart = new Date(date);
-    weekStart.setDate(diff);
-    weekStart.setHours(0, 0, 0, 0);
-    const year = weekStart.getFullYear();
-    const month = (weekStart.getMonth() + 1).toString().padStart(2, '0');
-    const day = weekStart.getDate().toString().padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    // 현지 시간 기준으로 요일(일:0, 월:1, ...)을 구함
+    const day = date.getDay();
+    // 만약 일요일이면 6일을 빼서 월요일 계산, 그 외엔 (day - 1)만큼 빼줌
+    const diff = date.getDate() - (day === 0 ? 6 : day - 1);
+    const monday = new Date(date.getFullYear(), date.getMonth(), diff);
+    const year = monday.getFullYear();
+    const month = String(monday.getMonth() + 1).padStart(2, '0');
+    const dayStr = String(monday.getDate()).padStart(2, '0');
+    return `${year}-${month}-${dayStr}`;
   };
+  
 
-  // 컴포넌트 마운트 시 오늘이 포함된 주의 시작일 설정 및 빈 주간 시간표 생성
+  // 컴포넌트 마운트 시 오늘이 포함된 주의 시작일(월요일) 설정
   useEffect(() => {
     const today = new Date();
-    const weekStart = calculateWeekStartLocal(today);
-    setCurrentWeekStart(weekStart);
-    setScheduleItems([]); // 초기에는 빈 일정 배열로 설정
+    const weekStartLocal = calculateWeekStartLocal(today);
+    setCurrentWeekStart(weekStartLocal);
+    
+    // 서버에서 연습 일정을 가져오기
+    fetchSchedules(weekStartLocal);
+    
+    // 팀 데이터 한 번만 가져오기
+    fetchTeams();
   }, []);
+
+  // 연습 일정 데이터를 가져오는 함수
+  // AdminSchedule.js 내의 fetchSchedules 함수의 일부
+  const fetchSchedules = (weekStart) => {
+    fetch(`http://localhost:4000/api/practice-schedules?week_start=${weekStart}`, {
+      credentials: 'include',
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        //console.log("Fetched practice schedules:", data);
+
+        // 데이터 변환: 각 항목에 subject와 color 필드 추가
+        const transformedData = data.map(item => ({
+          ...item,
+          subject: item.team_name,  // 팀 이름을 제목으로 사용
+          color: '#AED581'         // 예시: 셀 배경색. 필요에 따라 색상 변경
+        }));
+
+        setScheduleItems(transformedData);
+      })
+      .catch((err) => {
+        console.error("Error fetching practice schedules:", err);
+      });
+  };
+
+  // 팀 목록을 서버에서 불러오는 함수
+  const fetchTeams = () => {
+    fetch('http://localhost:4000/admin/teams', { credentials: 'include' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setAllTeams(data.teams);  // 전체 팀 목록을 상태에 저장
+          //console.log("Fetched teams data:", data.teams); // 팀 데이터 확인
+        } else {
+          console.log("팀 목록을 불러오는 데 실패했습니다.");
+        }
+      })
+      .catch((err) => {
+        console.error('팀 목록을 불러오지 못했습니다.', err);
+      });
+  };
+
+  // 셀 클릭 시, 해당 시간 슬롯이 비어있을 경우 모달을 열고, 일정이 없는 팀 목록을 조회
+  const handleCellClick = (day, time, scheduleItem) => {
+    if (scheduleItem) {
+      // scheduleItem이 존재하면 해당 셀의 정보로 selectedSlot 업데이트
+      setSelectedScheduleItem(scheduleItem);
+      setSelectedSlot({ day: scheduleItem.day, time: scheduleItem.time });
+      setDeleteModalOpen(true);
+      return;
+    }
+    setSelectedSlot({ day, time });
+    filterAvailableTeams(day, time);
+    setModalOpen(true);
+  };
+  
 
   // 주차 이동 기능
   const goToPreviousWeek = () => {
     const currentDate = new Date(currentWeekStart);
     currentDate.setDate(currentDate.getDate() - 7);
-    setCurrentWeekStart(`${currentDate.getFullYear()}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-${currentDate.getDate().toString().padStart(2, '0')}`);
-    setScheduleItems([]);
+    const newWeekStart = `${currentDate.getFullYear()}-${(currentDate.getMonth()+1)
+      .toString()
+      .padStart(2,'0')}-${currentDate.getDate().toString().padStart(2,'0')}`;
+    setCurrentWeekStart(newWeekStart);
+    fetchSchedules(newWeekStart);
   };
-
+  
   const goToNextWeek = () => {
     const currentDate = new Date(currentWeekStart);
     currentDate.setDate(currentDate.getDate() + 7);
-    setCurrentWeekStart(`${currentDate.getFullYear()}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-${currentDate.getDate().toString().padStart(2, '0')}`);
-    setScheduleItems([]);
+    const newWeekStart = `${currentDate.getFullYear()}-${(currentDate.getMonth()+1)
+      .toString()
+      .padStart(2,'0')}-${currentDate.getDate().toString().padStart(2,'0')}`;
+    setCurrentWeekStart(newWeekStart);
+    fetchSchedules(newWeekStart);
+  };  
+
+  // 팀 내 인원들만 가능한 팀을 필터링하는 함수
+  const filterAvailableTeams = (day, time) => {
+    fetch(`http://localhost:4000/api/available-users?day=${day}&time=${time}&week_start=${currentWeekStart}`, {
+      credentials: 'include',
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        const availableUsernames = data.map((user) => user.name.toLowerCase().trim()); // 소문자 및 공백 제거
+        //console.log("Available users:", availableUsernames); // 가능한 유저들을 출력
+
+        // 전체 팀 목록에서 필터링된 팀만 표시
+        const available = allTeams.filter((team) => {
+          const allUsersAvailable = team.users.every((user) => {
+            const isUserAvailable = availableUsernames.includes(user.toLowerCase().trim());
+            //console.log(`${user} available: ${isUserAvailable}`); // 각 유저가 가능한지 출력
+            return isUserAvailable;
+          });
+
+          //console.log(`Team ${team.name} - All users available: ${allUsersAvailable}`); // 팀이 모든 유저가 가능한지 확인
+          return allUsersAvailable; // 모든 유저가 가능한 팀만 필터링
+        });
+
+        if (available.length > 0) {
+          //console.log(`Possible teams for ${day} ${time}:`, available);
+        } else {
+          //console.log("No teams available for this time.");
+        }
+
+        setAvailableTeams(available); // 필터링된 팀 목록을 상태에 저장
+      })
+      .catch((err) => {
+        console.error("Error fetching available users:", err);
+        setAvailableTeams([]); // 오류 발생 시 빈 배열로 상태 초기화
+      });
   };
 
-  // 셀 클릭 시, 해당 시간 슬롯이 비어있을 경우 모달을 열고, 일정이 없는 사용자 목록을 조회
-  const handleCellClick = (day, time, scheduleItem) => {
-    if (scheduleItem) {
-      alert("해당 시간에는 이미 일정이 있습니다.");
+  // 팀을 선택/해제하는 함수
+  const toggleTeamSelection = (teamName) => {
+    setSelectedTeams((prev) => {
+      if (prev.includes(teamName)) {
+        return prev.filter((name) => name !== teamName);
+      } else {
+        return [...prev, teamName];
+      }
+    });
+  };
+
+  // 일정 삭제 함수
+  const handleDeleteSchedule = () => {
+    if (!selectedScheduleItem || !selectedScheduleItem.id) {
+      alert("삭제할 일정이 없습니다.");
       return;
     }
-    setSelectedSlot({ day, time });
-    fetch(`http://localhost:4000/api/available-users?day=${encodeURIComponent(day)}&time=${time}`, {
+
+    const scheduleId = selectedScheduleItem.id; // 삭제할 일정의 ID
+
+    fetch(`http://localhost:4000/api/practice-schedule/${scheduleId}`, {
+      method: 'DELETE',
       credentials: 'include',
     })
       .then((res) => {
-        if (!res.ok) throw new Error("사용자 목록을 불러오지 못했습니다.");
+        if (!res.ok) throw new Error('일정 삭제에 실패했습니다.');
         return res.json();
       })
-      .then((data) => {
-        setAvailableUsers(data); // 사용자 목록을 불러옴
-        // 선택된 사용자 상태 초기화
-        setSelectedUsers(data.reduce((acc, user) => {
-          acc[user.username] = false; // 기본적으로 모두 선택 안함
-          return acc;
-        }, {}));
+      .then(() => {
+        // 삭제 후, 일정 목록 업데이트
+        setScheduleItems((prev) =>
+          prev.filter((item) => item.id !== scheduleId)
+        );
+        setDeleteModalOpen(false); // 삭제 모달 닫기
+        alert('일정이 삭제되었습니다.');
       })
       .catch((err) => {
         console.error(err);
-        setAvailableUsers([]);
+        alert(err.message);
       });
-    setModalOpen(true);
   };
 
-  // 모달 내 체크박스: 사용자를 선택/해제하는 함수
-  const handleUserSelection = (username) => {
-    setSelectedUsers((prev) => ({
-      ...prev,
-      [username]: !prev[username], // 선택 상태 토글
-    }));
-  };
-
-  // 모달 제출: 선택한 사용자들을 일정에 할당
+  // 모달 제출: 선택한 팀들을 일정에 할당
   const handleModalSubmit = () => {
-    const selectedUsernames = Object.keys(selectedUsers).filter((username) => selectedUsers[username]);
-    if (selectedUsernames.length === 0) {
-      alert("일정을 생성할 사용자를 선택하세요.");
+    if (selectedTeams.length === 0) {
+      alert("팀을 선택하세요.");
       return;
     }
 
+    // 팀 이름과 유저들을 저장
+    const usersForTeams = [];
+
+   // 각 팀에 대해 해당 팀의 유저들을 찾아서 배열에 저장
+    selectedTeams.forEach(teamName => {
+      const team = allTeams.find(t => t.name === teamName); // allTeams에서 해당 팀을 찾기
+      if (team) {
+        usersForTeams.push(...team.users); // 해당 팀의 유저들을 추가
+      }
+    });
+
     const newItem = {
-      day: selectedSlot.day,
-      time: selectedSlot.time,
-      subject: selectedUsernames.join(', '),
-      color: "#e0f7fa",
-      week_start: currentWeekStart,
+      teamName: selectedTeams.join(', '),  // 팀 이름을 팀명으로 저장
+      users: usersForTeams,  // 선택된 팀들의 유저들을 배열로 저장
+      day: selectedSlot.day,  // 연습일
+      time: selectedSlot.time,  // 연습시간
+      weekStart: currentWeekStart  // 주 시작일
     };
 
-    const updatedItems = [...scheduleItems, newItem];
-    fetch('http://localhost:4000/api/schedule', {
+    // 해당 일정을 practice_schedules 테이블에 저장
+    fetch('http://localhost:4000/api/practice-schedule', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ week_start: currentWeekStart, scheduleItems: updatedItems }),
+      body: JSON.stringify(newItem)
     })
       .then((res) => {
         if (!res.ok) throw new Error("일정 저장에 실패했습니다.");
         return res.json();
       })
       .then(() => {
-        setScheduleItems(updatedItems);
-        setSelectedUsers({});
+        // 일정 저장 후 상태 업데이트
+        alert("연습 일정이 저장되었습니다.");
+        setSelectedTeams([]);
         setSelectedSlot({ day: '', time: null });
         setModalOpen(false);
+        fetchSchedules(currentWeekStart); // 일정 목록 다시 가져오기
       })
       .catch((err) => alert(err.message));
-  };
+    };
+
 
   const handleModalCancel = () => {
     setModalOpen(false);
-    setSelectedUsers({});
+    setSelectedTeams([]);
     setSelectedSlot({ day: '', time: null });
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteModalOpen(false); // 삭제 모달 닫기
   };
 
   return (
     <div style={{ padding: '20px' }}>
-      <h2>주간 연습 일정 관리 (Admin)</h2>
+      <h2>팀 연습 일정 관리 (Admin)</h2>
       <div style={{ textAlign: 'center', marginBottom: '10px' }}>
         <button onClick={goToPreviousWeek} style={navButtonStyle}>이전 주</button>
         <span style={{ margin: '0 10px' }}>주 시작일: {currentWeekStart}</span>
         <button onClick={goToNextWeek} style={navButtonStyle}>다음 주</button>
       </div>
+
       <Timetable
         days={days}
         times={times}
-        scheduleItems={scheduleItems}
+        scheduleItems={scheduleItems}  // 데이터베이스에서 가져온 연습 일정을 전달
         onCellClick={handleCellClick}
-        selectedCells={[]} // 관리자용 일정 생성은 개별 셀 선택 모달로 처리하므로 빈 배열 전달
+        selectedCells={[]}  // 관리자용 일정 생성은 개별 셀 선택 모달로 처리하므로 빈 배열 전달
       />
+
       {modalOpen && (
         <div style={modalOverlayStyle}>
           <div style={modalContentStyle}>
             <h3>선택된 시간: {selectedSlot.day}요일, {selectedSlot.time}시</h3>
-            <p>일정이 없는 사용자 목록:</p>
-            {availableUsers.length > 0 ? (
+            <p>가능한 팀들:</p>
+            {availableTeams.length > 0 ? (
               <ul style={{ textAlign: 'left' }}>
-                {availableUsers.map((user, idx) => (
+                {availableTeams.map((team, idx) => (
                   <li key={idx}>
                     <label>
                       <input
                         type="checkbox"
-                        value={user.username}
-                        checked={selectedUsers[user.username] || false}
-                        onChange={() => handleUserSelection(user.username)}
+                        value={team.name}
+                        checked={selectedTeams.includes(team.name)}
+                        onChange={() => toggleTeamSelection(team.name)}
                       />
-                      {user.name}
+                      {team.name} - {team.users.join(', ')}
                     </label>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p>해당 시간에 일정이 없는 사용자가 없습니다.</p>
+              <p>해당 시간에 가능한 팀이 없습니다.</p>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
               <button onClick={handleModalCancel} style={modalCancelButtonStyle}>취소</button>
@@ -173,6 +304,26 @@ function AdminSchedule() {
           </div>
         </div>
       )}
+
+{deleteModalOpen && (
+  <div style={modalOverlayStyle}>
+    <div style={modalContentStyle}>
+      <h3>선택된 시간: {selectedSlot.day}요일, {selectedSlot.time}시</h3>
+      {selectedScheduleItem && (
+        <>
+          <p>팀: {selectedScheduleItem.teamName}</p>
+          <p>참가 유저: {selectedScheduleItem.users.join(', ')}</p>
+        </>
+      )}
+      <p>일정을 삭제하시겠습니까?</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
+        <button onClick={handleDeleteCancel} style={modalCancelButtonStyle}>취소</button>
+        <button onClick={handleDeleteSchedule} style={modalButtonStyle}>확인</button>
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }
@@ -183,7 +334,7 @@ const navButtonStyle = {
   color: '#fff',
   border: 'none',
   borderRadius: '4px',
-  cursor: 'pointer',
+  cursor: 'pointer'
 };
 
 const modalOverlayStyle = {
@@ -196,7 +347,7 @@ const modalOverlayStyle = {
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
-  zIndex: 1000,
+  zIndex: 1000
 };
 
 const modalContentStyle = {
@@ -204,7 +355,7 @@ const modalContentStyle = {
   padding: '20px',
   borderRadius: '8px',
   width: '400px',
-  textAlign: 'center',
+  textAlign: 'center'
 };
 
 const modalCancelButtonStyle = {
@@ -213,7 +364,7 @@ const modalCancelButtonStyle = {
   color: '#fff',
   border: 'none',
   borderRadius: '4px',
-  cursor: 'pointer',
+  cursor: 'pointer'
 };
 
 const modalButtonStyle = {
@@ -222,7 +373,7 @@ const modalButtonStyle = {
   color: '#fff',
   border: 'none',
   borderRadius: '4px',
-  cursor: 'pointer',
+  cursor: 'pointer'
 };
 
 export default AdminSchedule;

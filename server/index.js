@@ -44,7 +44,7 @@ const pool = mariadb.createPool({
   password: process.env.DB_PASS || 'admin',
   database: process.env.DB_NAME || 'SLDB',
   port: process.env.DB_PORT || 3306,
-  connectionLimit: 5
+  connectionLimit: 20
 });
 
 // uploads 폴더가 없는 경우 자동 생성
@@ -526,6 +526,84 @@ app.post('/admin/create-team', async (req, res) => {
     res.status(500).json({ error: '팀 생성 중 오류가 발생했습니다.' });
   }
 });
+
+// 팀 목록을 가져오는 API
+app.get('/admin/teams', async (req, res) => {
+  try {
+    const conn = await pool.getConnection();
+    const teams = await conn.query('SELECT id, name, users FROM teams');
+    conn.release();
+    
+    res.json({ success: true, teams: teams });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '팀 목록을 불러오지 못했습니다.' });
+  }
+});
+
+// 연습일정 저장 API (팀별로 유저를 배열로 저장)
+app.post('/api/practice-schedule', async (req, res) => {
+  if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
+
+  const { teamName, users, day, time, weekStart } = req.body;
+
+  try {
+    const conn = await pool.getConnection();
+    await conn.query(
+      'INSERT INTO practice_schedules (team_name, users, day, time, week_start) VALUES (?, ?, ?, ?, ?)',
+      [teamName, JSON.stringify(users), day, time, weekStart]
+    );
+    conn.release();
+    res.json({ success: true, message: '연습 일정이 저장되었습니다.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '연습 일정 저장에 실패했습니다.' });
+  }
+});
+
+// 연습 일정 데이터 가져오기
+app.get('/api/practice-schedules', async (req, res) => {
+  if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
+
+  const { week_start } = req.query; // 주 시작일을 받아옵니다.
+
+  try {
+    const conn = await pool.getConnection();
+    const query = 
+      'SELECT * FROM practice_schedules WHERE week_start = ?';
+    const schedules = await conn.query(query, [week_start]);
+    conn.release();
+    
+    res.json(schedules); // 연습 일정 데이터를 반환
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '서버 오류' });
+  }
+});
+
+// ─── 연습 일정 삭제 엔드포인트 ─────────────────────────────────────────────
+app.delete('/api/practice-schedule/:id', async (req, res) => {
+  if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
+  
+  const id = req.params.id;
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const result = await conn.query(
+      'DELETE FROM practice_schedules WHERE id = ?',
+      [id]
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: '해당 연습 일정이 존재하지 않습니다.' });
+    }
+    res.json({ success: true, message: '연습 일정이 삭제되었습니다.', id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {

@@ -47,6 +47,7 @@ function UserSchedule() {
         return res.json();
       })
       .then(data => {
+        //console.log("불러온 일정 데이터:", data);
         // week_start 값을 KST 기준으로 변환하여 비교
         const currentWeekItems = data.filter(item => {
           if (!item.week_start) return false;

@@ -9,7 +9,7 @@ function AdminTeams() {
 
   // 유저 데이터를 불러오는 함수
   const fetchUsers = () => {
-    fetch('http://localhost:4000/admin/users', { credentials: 'include' })  // URL 수정
+    fetch('http://localhost:4000/admin/users', { credentials: 'include' })
       .then((res) => {
         if (!res.ok) throw new Error("유저 데이터를 불러오지 못했습니다.");
         return res.json();
@@ -26,6 +26,20 @@ function AdminTeams() {
       })
       .catch((err) => {
         console.error("유저 데이터를 불러오지 못했습니다.", err);
+      });
+  };
+
+  // 생성된 팀 목록을 서버에서 불러오는 함수
+  const fetchTeams = () => {
+    fetch('http://localhost:4000/admin/teams', { credentials: 'include' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setCreatedTeams(data.teams);  // 서버에서 받은 팀 목록 업데이트
+        }
+      })
+      .catch((err) => {
+        console.error("팀 목록을 불러오지 못했습니다.", err);
       });
   };
 
@@ -47,31 +61,57 @@ function AdminTeams() {
       return;
     }
 
-    // 팀 생성 로직
     const newTeam = {
-      name: teamName,
+      teamName: teamName,
       users: selectedUsers,
     };
 
-    // 생성된 팀을 상태에 추가
-    setCreatedTeams([...createdTeams, newTeam]);
-
-    // 팀 생성 후 상태 초기화
-    setTeamName('');
-    setSelectedUsers([]);
-    setErrorMessage('');
-    alert(`팀 "${teamName}"이(가) 생성되었습니다!`);
+    // 팀 생성 요청을 서버로 보내기
+    fetch('http://localhost:4000/admin/create-team', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(newTeam),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          alert(`팀 "${teamName}"이(가) 생성되었습니다!`);
+          fetchTeams();  // 팀 생성 후 팀 목록을 다시 불러옴
+          setTeamName('');
+          setSelectedUsers([]);
+          setErrorMessage('');
+        } else {
+          setErrorMessage(data.error || '팀 생성에 실패했습니다.');
+        }
+      })
+      .catch((err) => {
+        setErrorMessage('서버와의 연결에 실패했습니다.');
+        console.error(err);
+      });
   };
 
   // 팀 삭제
-  const deleteTeam = (teamName) => {
-    const updatedTeams = createdTeams.filter(team => team.name !== teamName);
-    setCreatedTeams(updatedTeams);
-    alert(`팀 "${teamName}"이(가) 삭제되었습니다!`);
+  const deleteTeam = (teamId) => {
+    fetch(`http://localhost:4000/admin/delete-team/${teamId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          alert(`팀이 삭제되었습니다!`);
+          fetchTeams();  // 삭제 후 팀 목록을 다시 불러옴
+        }
+      })
+      .catch((err) => {
+        console.error('팀 삭제에 실패했습니다.', err);
+      });
   };
 
   useEffect(() => {
     fetchUsers();  // 컴포넌트가 마운트될 때 유저 데이터를 불러옴
+    fetchTeams();  // 컴포넌트가 마운트될 때 팀 목록을 불러옴
   }, []);
 
   return (
@@ -126,12 +166,15 @@ function AdminTeams() {
           {createdTeams.length === 0 ? (
             <li>생성된 팀이 없습니다.</li>
           ) : (
-            createdTeams.map((team, index) => (
-              <li key={index} style={{ marginBottom: '10px' }}>
+            createdTeams.map((team) => (
+              <li key={team.id} style={{ marginBottom: '10px' }}>
                 <div>
                   <strong>{team.name}</strong> - {team.users.join(', ')}
                 </div>
-                <button onClick={() => deleteTeam(team.name)} style={{ backgroundColor: '#f44336', color: '#fff', padding: '6px 12px', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                <button
+                  onClick={() => deleteTeam(team.id)} // team.id를 사용하여 삭제
+                  style={{ backgroundColor: '#f44336', color: '#fff', padding: '6px 12px', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                >
                   삭제
                 </button>
               </li>
@@ -144,4 +187,3 @@ function AdminTeams() {
 }
 
 export default AdminTeams;
-  
