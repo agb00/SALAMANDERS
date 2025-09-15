@@ -8,7 +8,7 @@ function UserTimetable() {
 
   // 페이지 로드시 이미 업로드된 시간표 파일 경로를 서버에서 받아옴
   useEffect(() => {
-    fetch('http://localhost:4000/get-timetable', {
+    fetch('http://3.37.96.38:4000/get-timetable', {
       credentials: 'include',
     })
       .then((res) => res.json())
@@ -36,7 +36,7 @@ function UserTimetable() {
     formData.append('timetable', selectedFile);
 
     try {
-      const res = await fetch('http://localhost:4000/upload-timetable', {
+      const res = await fetch('http://3.37.96.38:4000/upload-timetable', {
         method: 'POST',
         credentials: 'include',
         body: formData,
@@ -68,7 +68,7 @@ function UserTimetable() {
       {existingFilePath ? (
         <div style={styles.previewContainer}>
           <img
-            src={`http://localhost:4000/${existingFilePath}`}
+            src={`http://3.37.96.38:4000/${existingFilePath}`}
             alt="업로드된 시간표"
             style={styles.previewImage}
           />
@@ -81,7 +81,7 @@ function UserTimetable() {
         <form onSubmit={handleUpload} style={styles.form}>
           <input
             type="file"
-            accept=".csv, .xlsx, .xls, image/*"
+            accept="image/*"
             onChange={handleFileChange}
             style={styles.inputFile}
           />

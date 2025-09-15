@@ -1,0 +1,17 @@
+0000000000000000000000000000000000000000 50e881fa0ce6e626e0994728be6bb38805491359 AEON <agbagb00@gmail.com> 1742789903 +0900	commit (initial): Initial commit with README
+50e881fa0ce6e626e0994728be6bb38805491359 5b03b122ec7a4f4836cc87cc917fca2f419a07cf AEON <agbagb00@gmail.com> 1742794395 +0900	commit: npx create-react-app .
+5b03b122ec7a4f4836cc87cc917fca2f419a07cf f9515252e9e9d4716fca0127203f0db2d42ceff6 AEON <agbagb00@gmail.com> 1742810473 +0900	pull: Fast-forward
+f9515252e9e9d4716fca0127203f0db2d42ceff6 3ca9bcf2a05a8b689e61f2baaf50965abc4170bd AEON <agbagb00@gmail.com> 1743053290 +0900	commit: hello.txt 작성
+3ca9bcf2a05a8b689e61f2baaf50965abc4170bd 557c584dd76ea6a0ed7e97110f02e77a2e6ee16e AEON <agbagb00@gmail.com> 1743138328 +0900	commit: 데이터베이스 생성 및 로그인 구현 기능 및 관리자 페이지 생성
+557c584dd76ea6a0ed7e97110f02e77a2e6ee16e f5b4cc872daffbaced61114dda86ffee3de081cb AEON <agbagb00@gmail.com> 1743386670 +0900	pull: Fast-forward
+f5b4cc872daffbaced61114dda86ffee3de081cb e18e9e7a78b7d8a0967a181569612ce64a3d0095 AEON <agbagb00@gmail.com> 1743410319 +0900	pull: Fast-forward
+e18e9e7a78b7d8a0967a181569612ce64a3d0095 663590027d9315b7ac5543935427e24eafddcfe4 AEON <agbagb00@gmail.com> 1743429290 +0900	commit: 3/31 노트북 작업 USER페이지 및 데이터베이스 스키마 변경
+663590027d9315b7ac5543935427e24eafddcfe4 6c6552166c84e6ab5c1d1879c5bb57d46dfe0eff AEON <agbagb00@gmail.com> 1743499041 +0900	pull: Fast-forward
+6c6552166c84e6ab5c1d1879c5bb57d46dfe0eff 6c6552166c84e6ab5c1d1879c5bb57d46dfe0eff AEON <agbagb00@gmail.com> 1743503317 +0900	reset: moving to origin/main
+6c6552166c84e6ab5c1d1879c5bb57d46dfe0eff e2cc629327812c9e8a44afd18fc00fa292f40090 AEON <agbagb00@gmail.com> 1743514860 +0900	commit: 4월 1일 노트북 작업 캘린더 데이터베이스 테이블 생성 및 기타 편집
+e2cc629327812c9e8a44afd18fc00fa292f40090 404ac040d43a873850ac5e9a7a3ce31df1dca122 AEON <agbagb00@gmail.com> 1743582929 +0900	commit: 시간표 관련 작업
+404ac040d43a873850ac5e9a7a3ce31df1dca122 6af4ef76eb72e93a35dd0d66294bf26412d32393 AEON <agbagb00@gmail.com> 1743582970 +0900	commit: test
+6af4ef76eb72e93a35dd0d66294bf26412d32393 75b0135223ab37df5e7fd3e0332abbb45b79173a AEON <agbagb00@gmail.com> 1743643611 +0900	commit: 시간표 표시 및 저장 기능 구현
+75b0135223ab37df5e7fd3e0332abbb45b79173a 7b7e62f5721fa9ded3b969919bc823374f12d554 AEON <agbagb00@gmail.com> 1743678562 +0900	commit: 4월 3일 노트북 작업
+7b7e62f5721fa9ded3b969919bc823374f12d554 5aedbfcf5dbba652fbd0d3c2ac43d7dde35360c3 AEON <agbagb00@gmail.com> 1744114700 +0900	commit: 25/04/08 페이지 완성 1.0.0 버전
+5aedbfcf5dbba652fbd0d3c2ac43d7dde35360c3 ef9c58c0ab868cd292497f44cd62f0302053772b agb00 <agbagb00@gmail.com> 1757923561 +0000	commit: EC2 운영 버전 커밋

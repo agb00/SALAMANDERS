@@ -15,7 +15,7 @@ function UserBaseSchedule({ username }) {
   useEffect(() => {
     if (!username) return;
     setLoading(true);
-    fetch(`http://localhost:4000/api/base-timetable?username=${username}`, {
+    fetch(`http://3.37.96.38:4000/api/base-timetable?username=${username}`, {
       credentials: 'include'
     })
       .then(res => {
@@ -75,7 +75,7 @@ function UserBaseSchedule({ username }) {
       }
     });
     // API 호출: POST /api/base-timetable
-    fetch(`http://localhost:4000/api/base-timetable`, {
+    fetch(`http://3.37.96.38:4000/api/base-timetable`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -171,7 +171,7 @@ function AdminUsers() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:4000/admin/users', {
+      const res = await fetch('http://3.37.96.38:4000/admin/users', {
         credentials: 'include',
       });
       if (!res.ok) {
@@ -188,7 +188,7 @@ function AdminUsers() {
   // 사용자 삭제
   const handleDelete = async (name) => {
     try {
-      const res = await fetch(`http://localhost:4000/admin/users/${name}`, {
+      const res = await fetch(`http://3.37.96.38:4000/admin/users/${name}`, {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -205,7 +205,7 @@ function AdminUsers() {
   // 새 사용자 등록
   const handleAddUser = async (newUser) => {
     try {
-      const res = await fetch('http://localhost:4000/admin/add-user', {
+      const res = await fetch('http://3.37.96.38:4000/admin/add-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -225,7 +225,7 @@ function AdminUsers() {
   // 사용자 수정 (PUT 요청)
   const handleUpdateUser = async (updatedUser) => {
     try {
-      const res = await fetch(`http://localhost:4000/admin/users/${updatedUser.name}`, {
+      const res = await fetch(`http://3.37.96.38:4000/admin/users/${updatedUser.name}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -313,7 +313,7 @@ function AdminUsers() {
               {/* 왼쪽: 업로드된 시간표 이미지 추가 */}
               <div style={{ flex: 1, textAlign: 'center' }}>
                 <img
-                  src={`http://localhost:4000/uploads/timetables/${encodeURIComponent(selectedUserForSchedule.name)}.jpg`}
+                  src={`http://3.37.96.38:4000/uploads/timetables/${encodeURIComponent(selectedUserForSchedule.name)}.jpg`}
                   alt="업로드된 시간표"
                   style={{ maxWidth: '100%' }}
                   onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }}

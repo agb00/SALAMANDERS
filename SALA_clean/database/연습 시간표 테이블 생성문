@@ -1,0 +1,8 @@
+CREATE TABLE practice_schedules (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  team_name VARCHAR(255) NOT NULL,
+  users JSON NOT NULL,        -- 유저 목록을 JSON 배열로 저장
+  day VARCHAR(10) NOT NULL,   -- 연습일
+  time INT NOT NULL,          -- 연습시간
+  week_start DATE NOT NULL    -- 해당 주의 시작일
+);

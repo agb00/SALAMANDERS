@@ -20,6 +20,7 @@ import UserTimetable from './UserTimetable';
 import UserSchedule from './UserSchedule';
 import UserPractice from './UserPractice';
 import UserTeam from './UserTeam';
+import SalaSchedule from './SalaSchedule';
 
 function LoginModal({ onLoginSuccess }) {
   const [username, setUsername] = useState('');
@@ -28,7 +29,7 @@ function LoginModal({ onLoginSuccess }) {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:4000/login', {
+      const response = await fetch('http://3.37.96.38:4000/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -89,7 +90,7 @@ function AppContent() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetch('http://localhost:4000/session', {
+    fetch('http://3.37.96.38:4000/session', {
       credentials: 'include',
     })
       .then((res) => res.json())
@@ -181,7 +182,7 @@ function AppContent() {
         <Route path="/user/timetable" element={<UserTimetable />} />
         <Route path="/user/schedule" element={<UserSchedule />} />
         <Route path="/user/practice" element={<UserPractice />} />
-        <Route path="/user/team" element={<UserTeam />} />
+        <Route path="/sala/schedule" element={<SalaSchedule />} />
       </Routes>
     </div>
   );

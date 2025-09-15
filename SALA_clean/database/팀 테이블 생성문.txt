@@ -1,0 +1,13 @@
+CREATE TABLE teams (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  users JSON NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS teams (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,       -- 팀 이름
+  users JSON NOT NULL,              -- 팀에 포함된 사용자 목록 (JSON 형식으로 저장)
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- 생성 일시
+);

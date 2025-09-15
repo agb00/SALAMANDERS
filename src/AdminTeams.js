@@ -9,7 +9,7 @@ function AdminTeams() {
 
   // 유저 데이터를 불러오는 함수
   const fetchUsers = () => {
-    fetch('http://localhost:4000/admin/users', { credentials: 'include' })
+    fetch('http://3.37.96.38:4000/admin/users', { credentials: 'include' })
       .then((res) => {
         if (!res.ok) throw new Error("유저 데이터를 불러오지 못했습니다.");
         return res.json();
@@ -31,7 +31,7 @@ function AdminTeams() {
 
   // 생성된 팀 목록을 서버에서 불러오는 함수
   const fetchTeams = () => {
-    fetch('http://localhost:4000/admin/teams', { credentials: 'include' })
+    fetch('http://3.37.96.38:4000/admin/teams', { credentials: 'include' })
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -67,7 +67,7 @@ function AdminTeams() {
     };
 
     // 팀 생성 요청을 서버로 보내기
-    fetch('http://localhost:4000/admin/create-team', {
+    fetch('http://3.37.96.38:4000/admin/create-team', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -93,7 +93,7 @@ function AdminTeams() {
 
   // 팀 삭제
   const deleteTeam = (teamId) => {
-    fetch(`http://localhost:4000/admin/delete-team/${teamId}`, {
+    fetch(`http://3.37.96.38:4000/admin/delete-team/${teamId}`, {
       method: 'DELETE',
       credentials: 'include',
     })

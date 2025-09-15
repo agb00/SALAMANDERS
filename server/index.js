@@ -31,7 +31,7 @@ app.use(session({
 
 // CORS 설정 (세션 쿠키 사용을 위해 credentials 포함)
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: 'http://3.37.96.38:3000',
   credentials: true
 }));
 
@@ -53,14 +53,28 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-/*
-  ※ 데이터베이스 스키마는
-     - 기본 시간표: base_timetables
-     - 주차별 일정: schedule_items
-  로 사전에 생성해두셨다고 가정합니다.
-*/
+/* ────────────────────────────── 미들웨어 정의 ────────────────────────────── */
+// 사용자 인증 미들웨어 (세션 검증)
+const authenticate = (req, res, next) => {
+  if (req.session && req.session.user) {
+    next();
+  } else {
+    return res.status(401).json({ error: '로그인이 필요합니다.' });
+  }
+};
 
-// ─── 회원가입 ─────────────────────────────────────────────────────────────
+// 관리자 권한 검증 미들웨어
+const authorizeAdmin = (req, res, next) => {
+  if (req.session && req.session.user && req.session.user.isAdmin) {
+    next();
+  } else {
+    return res.status(403).json({ error: '관리자 권한이 필요합니다.' });
+  }
+};
+
+/* ────────────────────────────── API 엔드포인트 ────────────────────────────── */
+
+// ─── 회원가입 ─────────────────────────────────────────────
 app.post('/register', async (req, res) => {
   const { name, password, phone, part, ST } = req.body;
   if (!name || !password || !phone || !part || !ST) {
@@ -81,7 +95,7 @@ app.post('/register', async (req, res) => {
   }
 });
 
-// ─── 로그인 ─────────────────────────────────────────────────────────────
+// ─── 로그인 ─────────────────────────────────────────────
 app.post('/login', async (req, res) => {
   const { name, password } = req.body;
   if (!name || !password) {
@@ -112,17 +126,26 @@ app.post('/login', async (req, res) => {
   }
 });
 
-// ─── 세션 상태 확인 ─────────────────────────────────────────────────────────────
-app.get('/session', (req, res) => {
-  if (req.session.user) {
-    res.json({ loggedIn: true, user: req.session.user });
-  } else {
-    res.json({ loggedIn: false });
-  }
+// ─── 세션 상태 확인 (인증 필요) ─────────────────────────────────────────────
+app.get('/session', authenticate, (req, res) => {
+  res.json({ loggedIn: true, user: req.session.user });
 });
 
-// ─── 관리자 전용 사용자 관련 엔드포인트 ─────────────────────────────────────────────────────────────
-app.post('/admin/add-user', async (req, res) => {
+// ─── 로그아웃 ─────────────────────────────────────────────
+app.post('/logout', authenticate, (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: '로그아웃 중 오류 발생' });
+    }
+    res.clearCookie('connect.sid');
+    return res.json({ success: true });
+  });
+});
+
+// ─── 관리자 전용 사용자 관련 엔드포인트 ─────────────────────────────────────────────
+// 관리자 엔드포인트에는 authenticate + authorizeAdmin 미들웨어를 사용
+app.post('/admin/add-user', authenticate, authorizeAdmin, async (req, res) => {
   const { name, password, phone, part, ST } = req.body;
   if (!name || !password || !phone || !part || !ST) {
     return res.status(400).json({ error: '모든 필드를 입력하세요.' });  
@@ -142,7 +165,7 @@ app.post('/admin/add-user', async (req, res) => {
   }
 });
 
-app.get('/admin/users', async (req, res) => {
+app.get('/admin/users', authenticate, authorizeAdmin, async (req, res) => {
   try {
     const conn = await pool.getConnection();
     const rows = await conn.query('SELECT name, password, phone, part, ST FROM users');
@@ -154,7 +177,7 @@ app.get('/admin/users', async (req, res) => {
   }
 });
 
-app.delete('/admin/users/:name', async (req, res) => {
+app.delete('/admin/users/:name', authenticate, authorizeAdmin, async (req, res) => {
   const { name } = req.params;
   try {
     const conn = await pool.getConnection();
@@ -170,7 +193,7 @@ app.delete('/admin/users/:name', async (req, res) => {
   }
 });
 
-app.put('/admin/users/:name', async (req, res) => {
+app.put('/admin/users/:name', authenticate, authorizeAdmin, async (req, res) => {
   const { name } = req.params;
   const { password, phone, part, ST } = req.body;
   try {
@@ -195,20 +218,9 @@ app.put('/admin/users/:name', async (req, res) => {
   }
 });
 
-// ─── 로그아웃 ─────────────────────────────────────────────────────────────
-app.post('/logout', (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: '로그아웃 중 오류 발생' });
-    }
-    res.clearCookie('connect.sid');
-    return res.json({ success: true });
-  });
-});
-
-// ─── 시간표 업로드 및 조회 관련 엔드포인트 ─────────────────────────────────────────────────────────────
-app.post('/upload-timetable', upload.single('timetable'), async (req, res) => {
+// ─── 시간표 업로드 및 조회 관련 엔드포인트 ─────────────────────────────────────────────
+// 업로드와 관련된 엔드포인트는 인증이 필요합니다.
+app.post('/upload-timetable', authenticate, upload.single('timetable'), async (req, res) => {
   try {
     const filePath = req.file.path;
     
@@ -254,10 +266,7 @@ app.post('/upload-timetable', upload.single('timetable'), async (req, res) => {
   }
 });
 
-app.get('/get-timetable', (req, res) => {
-  if (!req.session.user) {
-    return res.status(401).json({ error: '로그인이 필요합니다.' });
-  }
+app.get('/get-timetable', authenticate, (req, res) => {
   const username = req.session.user.name;
   const uploadDir = path.join(__dirname, 'uploads', 'timetables');
   const fileName = username + '.jpg'; // 실제 파일 확장자에 맞게 수정
@@ -269,10 +278,7 @@ app.get('/get-timetable', (req, res) => {
   }
 });
 
-app.get('/user/timetable-data', async (req, res) => {
-  if (!req.session.user) {
-    return res.status(401).json({ error: '로그인이 필요합니다.' });
-  }
+app.get('/user/timetable-data', authenticate, async (req, res) => {
   const username = req.session.user.name;
   try {
     const conn = await pool.getConnection();
@@ -289,11 +295,7 @@ app.get('/user/timetable-data', async (req, res) => {
 });
 
 // ─── [추가] 사용자 시간표 조회 엔드포인트 ─────────────────────────────────────────────
-// GET /admin/users/:userId/schedule
-// 1. 먼저 schedule_items 테이블에서 오늘이 포함된 주(월~일)의 데이터 조회
-// 2. 데이터가 없으면 base_timetables 테이블에서 해당 사용자의 기본 시간표 조회
-// 3. 둘 다 없으면 빈 배열 반환
-app.get('/admin/users/:userId/schedule', async (req, res) => {
+app.get('/admin/users/:userId/schedule', authenticate, authorizeAdmin, async (req, res) => {
   try {
     const { userId } = req.params;
     // 현재 주(월요일 ~ 일요일)의 시작일과 종료일 계산
@@ -335,8 +337,7 @@ app.get('/admin/users/:userId/schedule', async (req, res) => {
 });
 
 // ─── [추가] 관리자 전용 기본 시간표 관리 API ─────────────────────────────────────────────
-app.get('/api/base-timetable', async (req, res) => {
-  if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
+app.get('/api/base-timetable', authenticate, async (req, res) => {
   const currentUser = req.session.user;
   let targetUsername = currentUser.name;
   if (currentUser.isAdmin && req.query.username) {
@@ -357,11 +358,7 @@ app.get('/api/base-timetable', async (req, res) => {
   }
 });
 
-// POST /api/base-timetable - 관리자 전용, 대상 사용자의 기본 시간표 업데이트
-app.post('/api/base-timetable', async (req, res) => {
-  if (!req.session.user || !req.session.user.isAdmin) {
-    return res.status(401).json({ error: '관리자 권한이 필요합니다.' });
-  }
+app.post('/api/base-timetable', authenticate, authorizeAdmin, async (req, res) => {
   const { username, timetable } = req.body;
   if (!username || !Array.isArray(timetable)) {
     return res.status(400).json({ error: 'username과 timetable 배열이 필요합니다.' });
@@ -384,8 +381,7 @@ app.post('/api/base-timetable', async (req, res) => {
 });
 
 // ─── [추가] 사용자 주차별 일정 관리 API ─────────────────────────────────────────────
-app.get('/api/schedule', async (req, res) => {
-  if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
+app.get('/api/schedule', authenticate, async (req, res) => {
   const username = req.session.user.name;
   let conn;
   try {
@@ -402,8 +398,7 @@ app.get('/api/schedule', async (req, res) => {
   }
 });
 
-app.post('/api/schedule', async (req, res) => {
-  if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
+app.post('/api/schedule', authenticate, async (req, res) => {
   const username = req.session.user.name;
   const { week_start, scheduleItems } = req.body;
   if (!week_start || !Array.isArray(scheduleItems)) {
@@ -432,8 +427,7 @@ app.post('/api/schedule', async (req, res) => {
   }
 });
 
-app.delete('/api/schedule/:id', async (req, res) => {
-  if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
+app.delete('/api/schedule/:id', authenticate, async (req, res) => {
   const username = req.session.user.name;
   const id = req.params.id;
   let conn;
@@ -455,10 +449,7 @@ app.delete('/api/schedule/:id', async (req, res) => {
 });
 
 // ─── [추가] 해당 시간에 일정이 없는 사용자 목록 API ─────────────────────────────
-// GET /api/available-users?day=월&time=11&week_start=YYYY-MM-DD (week_start는 선택사항)
-app.get('/api/available-users', async (req, res) => {
-  if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
-  
+app.get('/api/available-users', authenticate, async (req, res) => {
   const { day, time, week_start } = req.query;
   if (!day || !time) {
     return res.status(400).json({ error: 'day와 time 파라미터가 필요합니다.' });
@@ -467,9 +458,9 @@ app.get('/api/available-users', async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
-    // 모든 사용자 이름을 조회 (필요한 경우 다른 정보도 함께 조회)
+    // 모든 사용자 이름 조회
     const users = await conn.query('SELECT name FROM users');
-    // 해당 day, time, (선택적으로 week_start) 에 일정이 있는 사용자 조회
+    // 해당 시간대 일정이 있는 사용자 조회
     let query = 'SELECT username FROM schedule_items WHERE day = ? AND time = ?';
     let params = [day, time];
     if (week_start) {
@@ -478,7 +469,7 @@ app.get('/api/available-users', async (req, res) => {
     }
     const busyUsers = await conn.query(query, params);
     const busyUsernames = busyUsers.map(u => u.username);
-    // available users: users not in busyUsernames
+    // 사용 가능한 사용자 필터링
     const availableUsers = users.filter(user => !busyUsernames.includes(user.name));
     res.json(availableUsers);
   } catch (err) {
@@ -489,8 +480,8 @@ app.get('/api/available-users', async (req, res) => {
   }
 });
 
-// 팀 생성 API 추가
-app.post('/admin/create-team', async (req, res) => {
+// ─── 관리자 전용 팀 생성 및 조회 API ─────────────────────────────────────────────
+app.post('/admin/create-team', authenticate, authorizeAdmin, async (req, res) => {
   const { teamName, users } = req.body;
 
   if (!teamName || !users || users.length === 0) {
@@ -503,18 +494,17 @@ app.post('/admin/create-team', async (req, res) => {
     // 팀 생성
     const result = await conn.query('INSERT INTO teams (name, users) VALUES (?, ?)', [
       teamName,
-      JSON.stringify(users), // 유저 목록을 JSON 형식으로 저장
+      JSON.stringify(users)
     ]);
 
     const teamId = result.insertId; // 생성된 팀의 ID
 
-    // 유저-팀 관계 저장 (user_teams 테이블에 유저와 팀을 연결)
+    // 유저-팀 관계 저장
     for (const userName of users) {
       const userResult = await conn.query('SELECT id FROM users WHERE name = ?', [userName]);
       if (userResult.length === 0) {
-        continue; // 유저가 존재하지 않으면 무시
+        continue;
       }
-
       const userId = userResult[0].id;
       await conn.query('INSERT INTO user_teams (user_id, team_id) VALUES (?, ?)', [userId, teamId]);
     }
@@ -527,13 +517,36 @@ app.post('/admin/create-team', async (req, res) => {
   }
 });
 
-// 팀 목록을 가져오는 API
-app.get('/admin/teams', async (req, res) => {
+// 관리자 전용 팀 삭제 API 엔드포인트
+app.delete('/admin/delete-team/:id', authenticate, authorizeAdmin, async (req, res) => {
+  const teamId = req.params.id;
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    // 팀에 연결된 사용자 관계가 저장된 테이블이 있다면 먼저 삭제합니다.
+    // 만약 user_teams 테이블이 없다면 아래 쿼리는 생략해도 됩니다.
+    await conn.query('DELETE FROM user_teams WHERE team_id = ?', [teamId]);
+
+    // teams 테이블에서 팀 삭제
+    const result = await conn.query('DELETE FROM teams WHERE id = ?', [teamId]);
+    conn.release();
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: '해당 팀을 찾을 수 없습니다.' });
+    }
+    res.json({ success: true, message: '팀이 삭제되었습니다.' });
+  } catch (err) {
+    console.error(err);
+    if (conn) conn.release();
+    res.status(500).json({ error: '팀 삭제 중 오류가 발생했습니다.' });
+  }
+});
+
+app.get('/admin/teams', authenticate, authorizeAdmin, async (req, res) => {
   try {
     const conn = await pool.getConnection();
     const teams = await conn.query('SELECT id, name, users FROM teams');
     conn.release();
-    
     res.json({ success: true, teams: teams });
   } catch (err) {
     console.error(err);
@@ -541,10 +554,84 @@ app.get('/admin/teams', async (req, res) => {
   }
 });
 
-// 연습일정 저장 API (팀별로 유저를 배열로 저장)
-app.post('/api/practice-schedule', async (req, res) => {
-  if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
+// ─── [추가] 관리자 전용: 해당 주차에 비어있는 유저 목록 조회 ─────────────────────
+app.get('/api/admin/empty-week-users', authenticate, authorizeAdmin, async (req, res) => {
+  const { week_start } = req.query;
+  if (!week_start) {
+    return res.status(400).json({ error: 'week_start(YYYY-MM-DD) 쿼리 파라미터가 필요합니다.' });
+  }
 
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    // base_timetables에 존재하고, 해당 주차에 schedule_items가 하나도 없는 유저만
+    const rows = await conn.query(
+      `
+      SELECT DISTINCT bt.username
+      FROM base_timetables bt
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM schedule_items si
+        WHERE si.username = bt.username
+          AND si.week_start = ?
+      )
+      ORDER BY bt.username ASC
+      `,
+      [week_start]
+    );
+
+    return res.json({ users: rows });
+  } catch (err) {
+    console.error('[empty-week-users] error:', err);
+    return res.status(500).json({ error: '조회 실패' });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+// ─── [추가] 관리자 전용: 비어있는 유저 시간표를 기본 시간표로 채우기 ────────────────
+app.post('/api/admin/fill-week-from-base', authenticate, authorizeAdmin, async (req, res) => {
+  const { week_start } = req.body;
+  if (!week_start) {
+    return res.status(400).json({ error: 'week_start(YYYY-MM-DD) body 파라미터가 필요합니다.' });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    // base_timetables의 셀을 해당 주차로 복사 (이미 그 주에 어떤 셀이라도 있으면 대상 제외)
+    const result = await conn.query(
+      `
+      INSERT INTO schedule_items (username, week_start, day, time, subject, color)
+      SELECT bt.username, ?, bt.day, bt.time, bt.subject, bt.color
+      FROM base_timetables bt
+      WHERE bt.subject IS NOT NULL AND bt.subject <> ''
+        AND NOT EXISTS (
+          SELECT 1
+          FROM schedule_items si
+          WHERE si.username = bt.username
+            AND si.week_start = ?
+        )
+      `,
+      [week_start, week_start]
+    );
+
+    await conn.commit();
+    return res.json({ insertedRows: result.affectedRows || 0 });
+  } catch (err) {
+    if (conn) await conn.rollback();
+    console.error('[fill-week-from-base] error:', err);
+    return res.status(500).json({ error: '동기화 실패' });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+
+// ─── 연습 일정 저장 및 조회, 삭제 API ─────────────────────────────────────────────
+app.post('/api/practice-schedule', authenticate, async (req, res) => {
   const { teamName, users, day, time, weekStart } = req.body;
 
   try {
@@ -561,30 +648,21 @@ app.post('/api/practice-schedule', async (req, res) => {
   }
 });
 
-// 연습 일정 데이터 가져오기
-app.get('/api/practice-schedules', async (req, res) => {
-  if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
-
-  const { week_start } = req.query; // 주 시작일을 받아옵니다.
-
+app.get('/api/practice-schedules', authenticate, async (req, res) => {
+  const { week_start } = req.query;
   try {
     const conn = await pool.getConnection();
-    const query = 
-      'SELECT * FROM practice_schedules WHERE week_start = ?';
+    const query = 'SELECT * FROM practice_schedules WHERE week_start = ?';
     const schedules = await conn.query(query, [week_start]);
     conn.release();
-    
-    res.json(schedules); // 연습 일정 데이터를 반환
+    res.json(schedules);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: '서버 오류' });
   }
 });
 
-// ─── 연습 일정 삭제 엔드포인트 ─────────────────────────────────────────────
-app.delete('/api/practice-schedule/:id', async (req, res) => {
-  if (!req.session.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
-  
+app.delete('/api/practice-schedule/:id', authenticate, async (req, res) => {
   const id = req.params.id;
   let conn;
   try {
@@ -604,8 +682,7 @@ app.delete('/api/practice-schedule/:id', async (req, res) => {
   }
 });
 
-
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ 서버가 포트 ${PORT}에서 실행 중입니다`);
 });

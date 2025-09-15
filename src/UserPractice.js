@@ -8,20 +8,19 @@ function UserPractice() {
   // 개인 일정과 연습 일정 별도 상태
   const [personalScheduleItems, setPersonalScheduleItems] = useState([]);
   const [practiceScheduleItems, setPracticeScheduleItems] = useState([]);
-  // combinedScheduleItems는 두 배열을 병합한 결과
+  // 두 일정의 병합 결과
   const combinedScheduleItems = [...personalScheduleItems, ...practiceScheduleItems];
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [currentWeekStart, setCurrentWeekStart] = useState('');
-
-  // 현재 로그인한 사용자 이름 (실제 프로젝트에서는 세션이나 props 등을 통해 받아올 수 있음)
-  const currentUserName = "홍길동";
+  // 실제 로그인한 사용자 정보를 세션으로부터 받아옴
+  const [currentUser, setCurrentUser] = useState(null);
 
   // 현지 날짜 기준 "YYYY-MM-DD" 형식의 주 시작일(월요일) 계산 함수
   const calculateWeekStartLocal = (date) => {
-    const dayOfWeek = date.getDay(); // 일:0, 월:1, …
-    // 일요일(0)이면 전 주 월요일로 보정, 그 외에는 (day-1)만큼 빼줌
+    const dayOfWeek = date.getDay(); // 일:0, 월:1, … 
+    // 일요일이면 전 주 월요일로 보정, 그 외에는 (day-1)만큼 빼줌
     const diff = dayOfWeek === 0 ? date.getDate() - 6 : date.getDate() - dayOfWeek + 1;
     const weekStart = new Date(date);
     weekStart.setDate(diff);
@@ -32,6 +31,23 @@ function UserPractice() {
     return `${year}-${month}-${day}`;
   };
 
+  // 세션 정보를 통해 로그인 사용자 정보를 불러옴
+  useEffect(() => {
+    fetch('http://3.37.96.38:4000/session', { credentials: 'include' })
+      .then((res) => {
+        if (!res.ok) throw new Error('세션 정보를 불러오지 못했습니다.');
+        return res.json();
+      })
+      .then((data) => {
+        if (data.loggedIn && data.user) {
+          setCurrentUser(data.user);
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+      });
+  }, []);
+
   // 컴포넌트 마운트 시 현재 주의 시작일(월요일) 설정
   useEffect(() => {
     const today = new Date();
@@ -39,16 +55,17 @@ function UserPractice() {
     setCurrentWeekStart(weekStartLocal);
   }, []);
 
-  // 개인 일정 불러오기: /api/schedule (개인 등록 + 공유 일정) 및 없으면 /api/base-timetable 적용
+  // 개인 일정 불러오기 (현재 사용자의 일정)
   useEffect(() => {
-    if (!currentWeekStart) return;
+    // currentWeekStart와 currentUser 모두 설정되어 있어야 진행
+    if (!currentWeekStart || !currentUser) return;
     setLoading(true);
-    fetch('http://localhost:4000/api/schedule', { credentials: 'include' })
-      .then(res => {
+    fetch('http://3.37.96.38:4000/api/schedule', { credentials: 'include' })
+      .then((res) => {
         if (!res.ok) throw new Error('일정 데이터를 불러오지 못했습니다.');
         return res.json();
       })
-      .then(data => {
+      .then((data) => {
         // API로 받은 week_start 값을 KST 기준(UTC+9) 보정 후, 현재 주와 비교하여 필터링
         const weekItems = data.filter(item => {
           if (!item.week_start) return false;
@@ -60,11 +77,11 @@ function UserPractice() {
         });
 
         // (1) 사용자가 직접 등록한 일정: item.username이 현재 사용자와 일치
-        const directItems = weekItems.filter(item => item.username && item.username === currentUserName);
-        // (2) 그리고 공유 일정: item.users 배열에 현재 사용자가 포함된 경우
-        const sharedItems = weekItems.filter(item => item.users && item.users.includes(currentUserName));
+        const directItems = weekItems.filter(item => item.username && item.username === currentUser.name);
+        // (2) 공유 일정: item.users 배열에 현재 사용자가 포함된 경우
+        const sharedItems = weekItems.filter(item => item.users && item.users.includes(currentUser.name));
 
-        // 두 종류의 일정을 중복 없이 병합
+        // 두 종류의 일정을 중복 없이 병합하는 함수
         const mergeSchedules = (baseArray, extraArray) => {
           const merged = [...baseArray];
           extraArray.forEach(item => {
@@ -80,7 +97,7 @@ function UserPractice() {
           setLoading(false);
         } else {
           // 직접 등록한 일정이 없다면 기본 시간표 데이터를 가져와서 공유 일정과 병합
-          fetch('http://localhost:4000/api/base-timetable', { credentials: 'include' })
+          fetch('http://3.37.96.38:4000/api/base-timetable', { credentials: 'include' })
             .then(res => {
               if (!res.ok) throw new Error('기본 시간표 데이터를 불러오지 못했습니다.');
               return res.json();
@@ -97,13 +114,12 @@ function UserPractice() {
         setError(err.message);
         setLoading(false);
       });
-  }, [currentWeekStart, currentUserName]);
+  }, [currentWeekStart, currentUser]);
 
-  // 연습 일정 불러오기: /api/practice-schedules 엔드포인트 사용
+  // 연습 일정 불러오기: 팀 연습일정에서, 현재 사용자가 포함된 경우에만 출력
   useEffect(() => {
-    if (!currentWeekStart) return;
-    // 연습 일정은 KST 기준 주 시작일을 쿼리 파라미터로 넘김
-    fetch(`http://localhost:4000/api/practice-schedules?week_start=${currentWeekStart}`, {
+    if (!currentWeekStart || !currentUser) return;
+    fetch(`http://3.37.96.38:4000/api/practice-schedules?week_start=${currentWeekStart}`, {
       credentials: 'include'
     })
       .then(res => {
@@ -112,9 +128,11 @@ function UserPractice() {
       })
       .then(data => {
         // 각 항목에 subject와 color 필드를 추가 (팀 이름과 색상 지정)
-        const transformedData = data.map(item => ({
+        // 단, item.users 배열에 현재 사용자의 이름이 포함된 경우에만 포함
+        const filteredData = data.filter(item => item.users && item.users.includes(currentUser.name));
+        const transformedData = filteredData.map(item => ({
           ...item,
-          subject: item.team_name,  // 팀 이름을 제목으로
+          subject: item.team_name,  // 팀 이름을 제목으로 사용
           color: '#AED581'          // 연습 일정에 적용할 배경색 예시
         }));
         setPracticeScheduleItems(transformedData);
@@ -122,7 +140,7 @@ function UserPractice() {
       .catch(err => {
         console.error("연습 일정 로딩 오류:", err);
       });
-  }, [currentWeekStart]);
+  }, [currentWeekStart, currentUser]);
 
   // 주차 이동 기능: 이전 주, 다음 주 버튼 클릭 시 currentWeekStart 업데이트 후 재조회
   const goToPreviousWeek = () => {
@@ -141,6 +159,7 @@ function UserPractice() {
 
   if (loading) return <p>로딩 중...</p>;
   if (error) return <p>오류: {error}</p>;
+  if (!currentUser) return <p>사용자 정보를 불러오는 중...</p>;
 
   return (
     <div style={styles.container}>

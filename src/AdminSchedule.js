@@ -14,6 +14,10 @@ function AdminSchedule() {
   const [selectedTeams, setSelectedTeams] = useState([]); // 선택된 팀들
   const [allTeams, setAllTeams] = useState([]); // 전체 팀 목록
   const [selectedScheduleItem, setSelectedScheduleItem] = useState(null); // 삭제할 일정
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewUsers, setPreviewUsers] = useState([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState('');
 
   // 현지 날짜 기준 "YYYY-MM-DD" 형식의 주 시작일(월요일) 계산 함수
   const calculateWeekStartLocal = (date) => {
@@ -45,7 +49,7 @@ function AdminSchedule() {
   // 연습 일정 데이터를 가져오는 함수
   // AdminSchedule.js 내의 fetchSchedules 함수의 일부
   const fetchSchedules = (weekStart) => {
-    fetch(`http://localhost:4000/api/practice-schedules?week_start=${weekStart}`, {
+    fetch(`http://3.37.96.38:4000/api/practice-schedules?week_start=${weekStart}`, {
       credentials: 'include',
     })
       .then((res) => res.json())
@@ -68,7 +72,7 @@ function AdminSchedule() {
 
   // 팀 목록을 서버에서 불러오는 함수
   const fetchTeams = () => {
-    fetch('http://localhost:4000/admin/teams', { credentials: 'include' })
+    fetch('http://3.37.96.38:4000/admin/teams', { credentials: 'include' })
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -121,13 +125,13 @@ function AdminSchedule() {
 
   // 팀 내 인원들만 가능한 팀을 필터링하는 함수
   const filterAvailableTeams = (day, time) => {
-    fetch(`http://localhost:4000/api/available-users?day=${day}&time=${time}&week_start=${currentWeekStart}`, {
+    fetch(`http://3.37.96.38:4000/api/available-users?day=${day}&time=${time}&week_start=${currentWeekStart}`, {
       credentials: 'include',
     })
       .then((res) => res.json())
       .then((data) => {
         const availableUsernames = data.map((user) => user.name.toLowerCase().trim()); // 소문자 및 공백 제거
-        //console.log("Available users:", availableUsernames); // 가능한 유저들을 출력
+        console.log("Available users:", availableUsernames); // 가능한 유저들을 출력
 
         // 전체 팀 목록에서 필터링된 팀만 표시
         const available = allTeams.filter((team) => {
@@ -137,7 +141,7 @@ function AdminSchedule() {
             return isUserAvailable;
           });
 
-          //console.log(`Team ${team.name} - All users available: ${allUsersAvailable}`); // 팀이 모든 유저가 가능한지 확인
+          console.log(`Team ${team.name} - All users available: ${allUsersAvailable}`); // 팀이 모든 유저가 가능한지 확인
           return allUsersAvailable; // 모든 유저가 가능한 팀만 필터링
         });
 
@@ -175,7 +179,7 @@ function AdminSchedule() {
 
     const scheduleId = selectedScheduleItem.id; // 삭제할 일정의 ID
 
-    fetch(`http://localhost:4000/api/practice-schedule/${scheduleId}`, {
+    fetch(`http://3.37.96.38:4000/api/practice-schedule/${scheduleId}`, {
       method: 'DELETE',
       credentials: 'include',
     })
@@ -224,7 +228,7 @@ function AdminSchedule() {
     };
 
     // 해당 일정을 practice_schedules 테이블에 저장
-    fetch('http://localhost:4000/api/practice-schedule', {
+    fetch('http://3.37.96.38:4000/api/practice-schedule', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -255,6 +259,35 @@ function AdminSchedule() {
   const handleDeleteCancel = () => {
     setDeleteModalOpen(false); // 삭제 모달 닫기
   };
+
+  // [추가] 미리보기 열기
+  const openPreviewModal = async () => {
+    if (!currentWeekStart) {
+      alert('현재 주차가 설정되지 않았습니다.');
+      return;
+    }
+    setPreviewLoading(true);
+    setPreviewError('');
+    setPreviewUsers([]);
+    setPreviewOpen(true);
+    try {
+      const res = await fetch(
+        `http://3.37.96.38:4000/api/admin/empty-week-users?week_start=${encodeURIComponent(currentWeekStart)}`,
+        { credentials: 'include' }
+      );
+      if (!res.ok) throw new Error('조회 실패');
+      const data = await res.json();
+      setPreviewUsers(data.users || []);
+    } catch (err) {
+      console.error(err);
+      setPreviewError(err.message || '조회 중 오류가 발생했습니다.');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  // [추가] 미리보기 닫기
+  const closePreviewModal = () => setPreviewOpen(false);
 
   return (
     <div style={{ padding: '20px' }}>
@@ -305,24 +338,133 @@ function AdminSchedule() {
         </div>
       )}
 
-{deleteModalOpen && (
-  <div style={modalOverlayStyle}>
-    <div style={modalContentStyle}>
-      <h3>선택된 시간: {selectedSlot.day}요일, {selectedSlot.time}시</h3>
-      {selectedScheduleItem && (
-        <>
-          <p>팀: {selectedScheduleItem.teamName}</p>
-          <p>참가 유저: {selectedScheduleItem.users.join(', ')}</p>
-        </>
+      {deleteModalOpen && (
+        <div style={modalOverlayStyle}>
+          <div style={modalContentStyle}>
+            <h3>선택된 시간: {selectedSlot.day}요일, {selectedSlot.time}시</h3>
+            {selectedScheduleItem && (
+              <>
+                <p>팀: {selectedScheduleItem.teamName}</p>
+                <p>참가 유저: {selectedScheduleItem.users.join(', ')}</p>
+              </>
+            )}
+            <p>일정을 삭제하시겠습니까?</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
+              <button onClick={handleDeleteCancel} style={modalCancelButtonStyle}>취소</button>
+              <button onClick={handleDeleteSchedule} style={modalButtonStyle}>확인</button>
+            </div>
+          </div>
+        </div>
       )}
-      <p>일정을 삭제하시겠습니까?</p>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
-        <button onClick={handleDeleteCancel} style={modalCancelButtonStyle}>취소</button>
-        <button onClick={handleDeleteSchedule} style={modalButtonStyle}>확인</button>
+
+      {previewOpen && (
+        <div style={modalOverlayStyle}>
+          <div style={{ ...modalContentStyle, width: '440px', textAlign: 'left' }}>
+            <h3 style={{ marginTop: 0 }}>비어있는 유저 미리보기 — {currentWeekStart}</h3>
+
+            {previewLoading && <p>불러오는 중…</p>}
+            {!previewLoading && previewError && (
+              <p style={{ color: '#f44336' }}>오류: {previewError}</p>
+            )}
+            {!previewLoading && !previewError && (
+              <>
+                <p style={{ margin: '8px 0 12px' }}>
+                  총 <b>{previewUsers.length}</b>명
+                </p>
+                <div style={{
+                  maxHeight: '40vh',
+                  overflowY: 'auto',
+                  border: '1px solid #eee',
+                  padding: '8px',
+                  borderRadius: '6px',
+                  background: '#fafafa'
+                }}>
+                  {previewUsers.length > 0 ? (
+                    <ul style={{ margin: 0, paddingLeft: '18px' }}>
+                      {previewUsers.map((u, idx) => (
+                        <li key={idx} style={{ lineHeight: 1.6 }}>
+                          {u.username}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p style={{ margin: 0 }}>(없음)</p>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                  <button onClick={closePreviewModal} style={modalButtonStyle}>닫기</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* --- 동기화 & 미리보기 버튼 (하단 고정) --- */}
+      <div style={{
+        position: 'fixed',
+        right: '24px',
+        bottom: '24px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+        zIndex: 1100
+      }}>
+        <button
+          onClick={async () => {
+            if (!currentWeekStart) {
+              alert('현재 주차가 설정되지 않았습니다.');
+              return;
+            }
+            if (!window.confirm(`[관리자 동기화]\n${currentWeekStart} 주차 기준으로 "비어있는 유저"들의 시간표를 기본 시간표에서 채웁니다.`)) {
+              return;
+            }
+            try {
+              const res = await fetch('http://3.37.96.38:4000/api/admin/fill-week-from-base', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ week_start: currentWeekStart })
+              });
+              if (!res.ok) throw new Error('동기화 요청 실패');
+              const data = await res.json();
+              alert(`동기화 완료!\n복사된 셀: ${data.insertedRows || 0}개`);
+            } catch (err) {
+              console.error(err);
+              alert('동기화 실패: ' + err.message);
+            }
+          }}
+          style={{
+            padding: '12px 20px',
+            backgroundColor: '#4CAF50',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '24px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          동기화
+        </button>
+
+        <button
+          onClick={openPreviewModal}
+          style={{
+            padding: '12px 20px',
+            backgroundColor: '#607D8B',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '24px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          미리보기
+        </button>
       </div>
-    </div>
-  </div>
-)}
 
     </div>
   );

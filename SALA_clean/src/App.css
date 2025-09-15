@@ -1,0 +1,106 @@
+/* 1) HTML, body 기본 세팅: 높이를 100%로, 여백 제거 */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+/* 2) 최상위 App 컨테이너: flex 레이아웃으로 전체 화면 사용 */
+.App {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  font-family: sans-serif;
+}
+
+/* 로고 컨테이너: 세로/가로 중앙 정렬 */
+.logo-container {
+  flex: 1; /* 남은 공간을 가득 채워 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 로고 이미지 */
+.logo {
+  width: 60%;
+  max-width: 300px;
+  cursor: pointer;
+}
+
+/* 메인 화면: 세로/가로 중앙 정렬 */
+.main-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 모달 오버레이 (배경) */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+/* 모달 내용 */
+.modal-content {
+  background: #fff;
+  width: 90%;          /* 모바일 대응 */
+  max-width: 350px;    /* 너무 커지지 않도록 최대폭 제한 */
+  max-height: 80vh;    /* 화면 높이의 80%로 제한 */
+  overflow-y: auto;    /* 넘칠 경우 스크롤 */
+  border-radius: 8px;
+  position: relative;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* 닫기 버튼 */
+.close-button {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+/* 로그인 폼 */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  margin-top: 20px;
+}
+.login-form input {
+  padding: 12px;
+  margin-bottom: 12px;
+  font-size: 16px;
+}
+.login-form button {
+  padding: 12px;
+  font-size: 16px;
+  background: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* (선택) 작은 화면에서 폰트 크기 살짝 줄이기 */
+@media (max-width: 480px) {
+  .login-form input,
+  .login-form button {
+    font-size: 14px;
+  }
+}

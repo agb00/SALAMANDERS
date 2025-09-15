@@ -13,6 +13,8 @@ function UserSchedule() {
   const [modalOpen, setModalOpen] = useState(false);
   const [currentWeekStart, setCurrentWeekStart] = useState('');
   const [repeatWeekly, setRepeatWeekly] = useState(false); // 매주 반복 체크박스 상태
+  const [isListOpen, setIsListOpen] = useState(false);
+
 
   // 현지 날짜 기준 "YYYY-MM-DD" 형식의 주 시작일(월요일) 계산 함수
   const calculateWeekStartLocal = (date) => {
@@ -27,6 +29,29 @@ function UserSchedule() {
     return `${year}-${month}-${day}`;
   };
 
+  const handleDayHeaderClick = (day) => {
+    // 해당 요일의 모든 셀 객체 배열 생성
+    const allDayCells = times.map(time => {
+      const item = scheduleItems.find(i => i.day === day && i.time === time) || null;
+      return { day, time, item };
+    });
+
+    setSelectedCells(prev => {
+      // 이미 모두 선택된 상태면 토글하여 해제
+      const isAllSelected = allDayCells.every(cell =>
+        prev.some(sel => sel.day === cell.day && sel.time === cell.time)
+      );
+      if (isAllSelected) {
+        // 해당 요일 셀들만 prev에서 제거
+        return prev.filter(sel => sel.day !== day);
+      } else {
+        // 기존 선택 유지 + 해당 요일 전체 추가 (중복 자동 제거)
+        const others = prev.filter(sel => sel.day !== day);
+        return [...others, ...allDayCells];
+      }
+    });
+  };
+
   // 컴포넌트 마운트 시 오늘이 포함된 주의 시작일(월요일) 설정
   useEffect(() => {
     const today = new Date();
@@ -39,7 +64,7 @@ function UserSchedule() {
   useEffect(() => {
     if (!currentWeekStart) return;
     setLoading(true);
-    fetch('http://localhost:4000/api/schedule', {
+    fetch('http://3.37.96.38:4000/api/schedule', {
       credentials: 'include'
     })
       .then(res => {
@@ -63,7 +88,7 @@ function UserSchedule() {
           setLoading(false);
         } else {
           // schedule_items에 현재 주 데이터가 없으면 기본 시간표 데이터를 조회
-          fetch('http://localhost:4000/api/base-timetable', { credentials: 'include' })
+          fetch('http://3.37.96.38:4000/api/base-timetable', { credentials: 'include' })
             .then(res => {
               if (!res.ok) throw new Error('기본 시간표 데이터를 불러오지 못했습니다.');
               return res.json();
@@ -99,6 +124,7 @@ function UserSchedule() {
       alert("일정을 추가할 셀을 먼저 선택하세요.");
       return;
     }
+    setIsListOpen(false);
     setModalOpen(true);
   };
 
@@ -126,7 +152,7 @@ function UserSchedule() {
       }
     });
     // schedule_items 업데이트 (POST /api/schedule)
-    fetch('http://localhost:4000/api/schedule', {
+    fetch('http://3.37.96.38:4000/api/schedule', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -143,7 +169,7 @@ function UserSchedule() {
         setModalOpen(false);
         // 매주 반복 체크 시 기본 시간표(base_timetables)에도 저장
         if (repeatWeekly) {
-          fetch('http://localhost:4000/api/base-timetable', {
+          fetch('http://3.37.96.38:4000/api/base-timetable', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -200,6 +226,7 @@ function UserSchedule() {
         times={times}
         scheduleItems={scheduleItems}
         onCellClick={handleCellClick}
+        onDayHeaderClick={handleDayHeaderClick}
         selectedCells={selectedCells}
       />
       <div style={{ marginTop: '10px', display: 'flex', gap: '10px' }}>
@@ -209,7 +236,7 @@ function UserSchedule() {
             const updatedItems = scheduleItems.filter(item => {
               return !selectedCells.some(cell => cell.day === item.day && cell.time === item.time);
             });
-            fetch('http://localhost:4000/api/schedule', {
+            fetch('http://3.37.96.38:4000/api/schedule', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'include',
@@ -234,17 +261,31 @@ function UserSchedule() {
         <div style={modalStyles.overlay}>
           <div style={modalStyles.modal}>
             <h3>일정 수정</h3>
-            <div>
-              <p>선택된 셀:</p>
+            {/* 접기/펼치기 버튼 */}
+            <button
+              type="button"
+              onClick={() => setIsListOpen(prev => !prev)}
+              style={{
+                marginBottom: '10px',
+                padding: '4px 8px',
+                fontSize: '0.9rem',
+                cursor: 'pointer'
+              }}
+            >
+              {isListOpen
+                ? '선택된 셀 접기'
+                : `선택된 셀 ${selectedCells.length}개 보기`}
+            </button>
+
+            {/* 리스트는 isListOpen일 때만 렌더링 */}
+            {isListOpen && (
               <ul style={modalStyles.cellList}>
                 {selectedCells.map((cell, idx) => (
                   <li key={idx}>{cell.day}요일, {cell.time}시</li>
                 ))}
               </ul>
-            </div>
-            
+            )}
 
-            
             {/* 매주 반복 체크박스 추가 }
             <div style={{ marginBottom: '10px' }}>
               <label>
