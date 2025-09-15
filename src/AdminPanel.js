@@ -8,7 +8,7 @@ function AdminPanel() {
   // 로그아웃 처리 함수 (로그아웃 성공 시 페이지를 새로고침하며 /login으로 이동)
   const handleLogout = async () => {
     try {
-      const res = await fetch('http://localhost:4000/logout', {
+      const res = await fetch('http://3.37.96.38:4000/logout', {
         method: 'POST',
         credentials: 'include',
       });

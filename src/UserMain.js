@@ -8,7 +8,7 @@ function UserMain({ username, gisu }) {
   // 로그아웃 처리 함수
   const handleLogout = async () => {  
     try {
-      const res = await fetch('http://localhost:4000/logout', {
+      const res = await fetch('http://3.37.96.38:4000/logout', {
         method: 'POST',
         credentials: 'include',
       });
@@ -35,6 +35,9 @@ function UserMain({ username, gisu }) {
           📅 일정 관리
         </button>
         <button onClick={() => navigate('/user/practice')} style={btnStyle}>
+          🦎 연습 일정
+        </button>
+        <button onClick={() => navigate('/sala/schedule')} style={btnStyle}>
           🦎 셀레 일정
         </button>
         <button onClick={handleLogout} style={btnStyle}>

@@ -1,6 +1,6 @@
 import React from 'react';
 
-function Timetable({ days, times, scheduleItems, onCellClick, selectedCells = [] }) {
+function Timetable({ days, times, scheduleItems, onCellClick, onDayHeaderClick, selectedCells = [] }) {
   return (
     // 테이블이 컨테이너 너비를 넘어가면 가로 스크롤 가능하도록 감싸기
     <div style={{ overflowX: 'auto', width: '100%' }}>
@@ -9,7 +9,16 @@ function Timetable({ days, times, scheduleItems, onCellClick, selectedCells = []
           <tr>
             <th style={tableStyles.headerCell}></th>
             {days.map(day => (
-              <th key={day} style={tableStyles.headerCell}>{day}</th>
+              <th
+                key={day}
+                onClick={() => onDayHeaderClick && onDayHeaderClick(day)}   // ← 헤더 클릭
+                style={{
+                  ...tableStyles.headerCell,
+                  cursor: onDayHeaderClick ? 'pointer' : 'default'         // 포인터 표시
+                }}
+              >
+                {day}
+                </th>
             ))}
           </tr>
         </thead>
